@@ -27,10 +27,21 @@ import {
 } from "@/lib/gate";
 
 export const runtime = "nodejs";
-export const maxDuration = 180;
+// Đo thật: count=2 thường 9,6s, count=2 ở 2K 14,1s (các biến thể chạy song
+// song nên không cộng dồn). 180 là con số tự đặt cho an toàn và nó nói dối người
+// đọc — hạ về 60 cho khớp thực tế và khớp trần Vercel Hobby.
+export const maxDuration = 60;
 
 /** Trần biến thể một lần gọi — mỗi biến thể là một lần gọi model trả phí */
 const MAX_VARIANTS = 4;
+
+/**
+ * Ở 2K thì mỗi ảnh nặng ~1,1MB base64 (đã đo). Bốn ảnh là ~4,4MB — sát trần
+ * response 4,5MB của Vercel, tức lượt đắt nhất cũng là lượt dễ vỡ nhất. Hạ trần
+ * riêng cho 2K: vừa giữ payload trong ngưỡng, vừa chặn một lượt đốt 4 lần gọi
+ * model đắt nhất.
+ */
+const MAX_VARIANTS_HI = 2;
 
 export interface GenerateResponse {
   packId: string;
@@ -73,8 +84,9 @@ export async function POST(request: Request) {
     return Response.json({ error: (e as Error).message }, { status: 400 });
   }
 
+  const hiRes = body.quality === "high";
   const count = Math.min(
-    MAX_VARIANTS,
+    hiRes ? MAX_VARIANTS_HI : MAX_VARIANTS,
     Math.max(1, Math.round(typeof body.count === "number" ? body.count : 2))
   );
   const note =
@@ -82,11 +94,11 @@ export async function POST(request: Request) {
   const aspectRatio = isAspectChoice(body.aspectRatio)
     ? body.aspectRatio
     : pack.aspectRatio;
-  const imageSize = body.quality === "high" ? "2K" : undefined;
+  const imageSize = hiRes ? "2K" : undefined;
 
   // Chốt chi phí SAU khi biết `count` (mỗi biến thể = 1 lần gọi model) nhưng
   // TRƯỚC khi gọi. Trừ trước, không trừ sau khi thành công — xem lib/gate.ts.
-  const gate = checkGate(request, count);
+  const gate = await checkGate(request, count);
   if (isGateFailure(gate)) return gate.response;
 
   try {

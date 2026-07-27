@@ -9,7 +9,7 @@ model Gemini thật và file xuất thật.
 `src/lib/gate.ts`, ba lớp mạnh dần:
 
 1. **Trần dung lượng** (`checkSize`) — phải là dòng ĐẦU TIÊN của route, trước
-   `request.json()`. Gọi sau khi parse là vô nghĩa: 13MB đã nằm trong bộ nhớ rồi.
+   `request.json()`. Gọi sau khi parse là vô nghĩa: body đã nằm trong bộ nhớ rồi.
 2. **Hạn mức theo cookie ẩn danh** — chỉ chặn tai nạn và lạm dụng vãng lai; xoá
    cookie là hết. Cố ý chấp nhận, vì mục tiêu là cho người lạ dùng thử được.
 3. **Trần chi toàn cục mỗi ngày** (`PHOTO_GLOBAL_DAILY_CALLS`) — chốt cứng THẬT
@@ -17,11 +17,39 @@ model Gemini thật và file xuất thật.
    trong một ngày xấu nhất, KHÔNG đặt theo kỳ vọng lưu lượng.
 
 Hạn mức trừ TRƯỚC khi gọi model, không phải sau khi thành công — trừ sau thì một
-loạt request song song đều thấy bộ đếm còn nguyên và lọt hết.
+loạt request song song đều thấy bộ đếm còn nguyên và lọt hết. Kiểm-rồi-cộng là
+MỘT câu UPSERT (`ON CONFLICT ... WHERE`), không tách làm hai bước.
 
-Bộ đếm nằm trong bộ nhớ tiến trình: đúng với MỘT tiến trình `next start` (VPS,
-Docker), **đếm thiếu trên serverless đa-instance** — lúc đó đổi `bump`/`readCounter`
-sang Redis/KV.
+Kho đếm lỗi thì **chặn**, không cho qua: một cú nấc DB làm khách thấy "hệ thống
+bận" là chuyện phục hồi được, một hoá đơn model không trần thì không.
+
+### Kho đếm phải nằm ngoài tiến trình
+
+Bộ đếm trong RAM chỉ đúng khi chạy MỘT tiến trình. Trên serverless mỗi instance
+đếm riêng nên trần thật = trần × số instance — và số instance **tăng đúng lúc bị
+dội request**, tức nó hỏng đúng lúc cần nhất.
+
+Dùng Postgres (Neon) qua `PHOTO_DATABASE_URL`, chạy `migrations/001_photo_quota.sql`.
+**Không cần Redis** — một bảng đếm với UPSERT đã atomic sẵn. Bỏ trống biến này thì
+rơi về RAM: đủ cho `npm run dev` và test, không đủ cho production.
+
+## Deploy
+
+Đã đo thật (không phải suy từ config):
+
+| | đo được | trần Vercel |
+|---|---|---|
+| `/api/generate` count=2 thường | 9,6s · 0,51 MB | 60s (Hobby) · 4,5 MB |
+| `/api/generate` count=2 ở 2K | 14,1s · 2,18 MB | |
+
+Nên Vercel dùng được. Hai thứ đã xử để khớp:
+
+- `maxDuration` hạ từ 180 về 60. 180 là con số đặt cho an toàn và nó **nói dối
+  người đọc** — ai nhìn vào cũng tưởng route chạy 3 phút.
+- Ở 2K trần biến thể hạ còn 2 (`MAX_VARIANTS_HI`): 4 ảnh 2K ≈ 4,4 MB, sát trần
+  response 4,5 MB — lượt đắt nhất cũng là lượt dễ vỡ nhất.
+
+Trước khi đẩy: đặt `GEMINI_API_KEY`, `PHOTO_DATABASE_URL`, `PHOTO_GLOBAL_DAILY_CALLS`.
 
 ## Hai luồng
 

@@ -11,7 +11,7 @@ import { remainingFor, withClientCookie } from "@/lib/gate";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const { remaining, perDay, clientId } = remainingFor(request);
+  const { remaining, perDay, clientId } = await remainingFor(request);
   return withClientCookie(
     NextResponse.json({ remaining, perDay }),
     request,

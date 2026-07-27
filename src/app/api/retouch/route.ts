@@ -36,7 +36,7 @@ import {
 } from "@/lib/gate";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export interface RetouchResponse {
   photo: string;
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   const applied = sanitizeRetouch(spec, body);
 
   // 2 lượt: một lần sinh ảnh, một lần chấm lại landmark trên ảnh vừa sinh.
-  const gate = checkGate(request, 2);
+  const gate = await checkGate(request, 2);
   if (isGateFailure(gate)) return gate.response;
 
   let image;

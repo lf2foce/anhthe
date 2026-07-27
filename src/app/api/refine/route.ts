@@ -23,7 +23,7 @@ import {
 } from "@/lib/gate";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   // Trần dung lượng TRƯỚC khi đọc body — xem lib/gate.ts.
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const gate = checkGate(request, 1);
+  const gate = await checkGate(request, 1);
   if (isGateFailure(gate)) return gate.response;
 
   try {
