@@ -221,9 +221,29 @@ function SheetPreview({
               brightness={brightness}
               className="h-full w-full rounded-[2px] shadow-[0_0_0_1px_rgba(32,30,29,.12)]"
             />
+            <PreviewCropMarks />
           </div>
         );
       })}
     </div>
+  );
+}
+
+/** Dấu góc xem trước — nằm ngoài ảnh, cùng nguyên tắc với bản JPG 300dpi. */
+function PreviewCropMarks() {
+  const horizontal = "absolute h-px w-[5px] bg-n500/70";
+  const vertical = "absolute h-[5px] w-px bg-n500/70";
+
+  return (
+    <span className="pointer-events-none absolute inset-0">
+      <span className={`${horizontal} -left-2 top-0`} />
+      <span className={`${vertical} -top-2 left-0`} />
+      <span className={`${horizontal} -right-2 top-0`} />
+      <span className={`${vertical} -top-2 right-0`} />
+      <span className={`${horizontal} -left-2 bottom-0`} />
+      <span className={`${vertical} -bottom-2 left-0`} />
+      <span className={`${horizontal} -right-2 bottom-0`} />
+      <span className={`${vertical} -bottom-2 right-0`} />
+    </span>
   );
 }

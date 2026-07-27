@@ -103,15 +103,43 @@ export async function renderSheet(
   const originY = Math.round((sheetH - gridH) / 2);
 
   const composites = [];
+  const cropMarks: string[] = [];
+  const markGap = mmToPx(0.35, SHEET_DPI);
+  const markLength = mmToPx(1.3, SHEET_DPI);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
+      const left = originX + c * (cellW + gutter);
+      const top = originY + r * (cellH + gutter);
+      const right = left + cellW;
+      const bottom = top + cellH;
+
       composites.push({
         input: tile,
-        left: originX + c * (cellW + gutter),
-        top: originY + r * (cellH + gutter),
+        left,
+        top,
       });
+
+      // Dấu cắt nằm ngoài ảnh và thẳng đúng theo bốn cạnh. Vì không vẽ đè lên
+      // ảnh nên sau khi cắt sẽ không còn viền xám trên ảnh thành phẩm.
+      cropMarks.push(
+        `M ${left - markGap - markLength} ${top} H ${left - markGap}`,
+        `M ${left} ${top - markGap - markLength} V ${top - markGap}`,
+        `M ${right + markGap} ${top} H ${right + markGap + markLength}`,
+        `M ${right} ${top - markGap - markLength} V ${top - markGap}`,
+        `M ${left - markGap - markLength} ${bottom} H ${left - markGap}`,
+        `M ${left} ${bottom + markGap} V ${bottom + markGap + markLength}`,
+        `M ${right + markGap} ${bottom} H ${right + markGap + markLength}`,
+        `M ${right} ${bottom + markGap} V ${bottom + markGap + markLength}`
+      );
     }
   }
+
+  const cropMarkOverlay = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${sheetW}" height="${sheetH}">
+      <path d="${cropMarks.join(" ")}" fill="none" stroke="#9ca3af"
+        stroke-width="${mmToPx(0.15, SHEET_DPI)}" stroke-linecap="butt"/>
+    </svg>`
+  );
 
   const buffer = await sharp({
     create: {
@@ -121,7 +149,7 @@ export async function renderSheet(
       background: "#ffffff",
     },
   })
-    .composite(composites)
+    .composite([...composites, { input: cropMarkOverlay, left: 0, top: 0 }])
     .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
     .withDensity(SHEET_DPI)
     .toBuffer();

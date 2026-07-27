@@ -6,9 +6,13 @@ import { getDoc, mmToPx, outputSize } from "./docs";
 const us = getDoc("us")!;
 const vn34 = getDoc("vn34")!;
 
-async function solid(width: number, height: number): Promise<Buffer> {
+async function solid(
+  width: number,
+  height: number,
+  background = "#8899aa"
+): Promise<Buffer> {
   return sharp({
-    create: { width, height, channels: 3, background: "#8899aa" },
+    create: { width, height, channels: 3, background },
   })
     .jpeg()
     .toBuffer();
@@ -111,5 +115,13 @@ describe("renderSheet", () => {
     const small = await renderSheet(await solid(354, 472), vn34);
     const big = await renderSheet(await solid(600, 600), us);
     expect(big.count).toBeLessThan(small.count);
+  });
+
+  it("ảnh nền trắng vẫn có dấu cắt nhìn thấy được ở ngoài ảnh", async () => {
+    const sheet = await renderSheet(await solid(600, 600, "#ffffff"), us);
+    const stats = await sharp(sheet.buffer).stats();
+    expect(Math.min(...stats.channels.map((channel) => channel.min))).toBeLessThan(
+      220
+    );
   });
 });
