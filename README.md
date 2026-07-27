@@ -4,6 +4,9 @@ Bản chạy thật của prototype `Anh The Studio v2 (offline).html` — giữ
 luồng 6 màn và hệ thiết kế Organic, thay toàn bộ dữ liệu giả bằng camera thật,
 model Gemini thật và file xuất thật.
 
+Vận hành (dựng lần đầu, deploy, đối soát thanh toán, hỏng thì làm gì):
+**[docs/RUNBOOK.md](docs/RUNBOOK.md)**.
+
 ## Chốt chi phí — đọc trước khi deploy
 
 `src/lib/gate.ts`, ba lớp mạnh dần:
