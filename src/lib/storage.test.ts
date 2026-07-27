@@ -52,13 +52,27 @@ describe("watermark", () => {
     expect([meta.width, meta.height]).toEqual([600, 800]);
   });
 
-  it("thật sự đổi pixel — ảnh một màu sau khi đóng dấu phải hết đơn sắc", async () => {
-    const src = await solid(600, 800);
+  /**
+   * Phải thấy được trên MỌI nền, đặc biệt nền TRẮNG.
+   *
+   * Bản đầu vẽ chữ trắng 34% và tàng hình hoàn toàn trên ảnh thẻ — mà ảnh thẻ
+   * theo quy định là nền trắng, tức dấu vô dụng đúng ở luồng bán chính. Nó sống
+   * sót qua test vì test cũ chỉ dùng một nền ô-liu trung tính. Giờ canh cả ba.
+   */
+  it.each([
+    ["trắng (ảnh thẻ)", "#ffffff"],
+    ["đen (glamour, đen trắng)", "#101010"],
+    ["trung tính", "#7a8a5e"],
+  ])("thấy được trên nền %s", async (_label, bg) => {
+    const src = await sharp({
+      create: { width: 600, height: 800, channels: 3, background: bg },
+    })
+      .jpeg()
+      .toBuffer();
     const before = await sharp(src).stats();
     const after = await sharp(await watermarked(src)).stats();
-    // Ảnh gốc trơn một màu nên độ lệch chuẩn ~0; có chữ đè lên thì phải tăng.
     expect(after.channels[0].stdev).toBeGreaterThan(
-      before.channels[0].stdev + 1
+      before.channels[0].stdev + 3
     );
   });
 

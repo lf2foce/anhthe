@@ -19,7 +19,8 @@ import {
 import { computeCrop, extendToFit, type FaceLandmarks } from "@/lib/geometry";
 import { decodeDataUrl } from "@/lib/imageio";
 import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
-import { remainingFor } from "@/lib/gate";
+import { checkSize, remainingFor, withClientCookie } from "@/lib/gate";
+import { NextResponse } from "next/server";
 import {
   BACKGROUND_TOLERANCE,
   backgroundDeviation,
@@ -28,8 +29,6 @@ import {
   renderSingle,
   sharpExtend,
 } from "@/lib/render";
-
-import { checkSize } from "@/lib/gate";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -332,7 +331,15 @@ export async function POST(request: Request) {
       });
     }
 
-    return Response.json({ files, sessionId });
+    // PHẢI trả cookie: route này có thể là lượt gọi ĐẦU TIÊN của phiên (người
+    // dùng bỏ qua bước thay nền). Không đặt cookie thì lượt unlock sau tính ra
+    // một clientId khác, `ownsKey` sai, và khách không mở khoá được chính ảnh
+    // mình vừa trả tiền.
+    return withClientCookie(
+      NextResponse.json({ files, sessionId }),
+      request,
+      clientId
+    );
   } catch (e) {
     console.error("[api/export]", e);
     return Response.json({ error: (e as Error).message }, { status: 500 });

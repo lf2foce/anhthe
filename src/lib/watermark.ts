@@ -30,9 +30,17 @@ function overlaySvg(width: number, height: number): Buffer {
   // Phủ dư ra ngoài khung: sau khi xoay 30° thì mép sẽ hụt nếu chỉ vẽ vừa khung.
   for (let y = -height; y < height * 2; y += rowGap) {
     for (let x = -width; x < width * 2; x += colGap) {
+      // Chữ TRẮNG có viền ĐEN, cả hai đều bán trong suốt.
+      //
+      // Bản đầu chỉ có chữ trắng, và nó TÀNG HÌNH trên ảnh thẻ — vì ảnh thẻ theo
+      // quy định là nền TRẮNG. Trắng trên trắng. Lỗi này sống sót qua test vì
+      // test cũ chỉ dùng ảnh nền ô-liu; giờ có test riêng cho cả nền trắng lẫn
+      // nền đen.
       rows.push(
         `<text x="${x}" y="${y}" font-family="sans-serif" font-size="${font}" ` +
-          `fill="#ffffff" fill-opacity="0.34" font-weight="700">${WATERMARK_TEXT}</text>`
+          `font-weight="700" fill="#ffffff" fill-opacity="0.42" ` +
+          `stroke="#000000" stroke-opacity="0.30" stroke-width="${Math.max(1, font / 22)}" ` +
+          `paint-order="stroke">${WATERMARK_TEXT}</text>`
       );
     }
   }
