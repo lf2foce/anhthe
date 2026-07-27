@@ -191,15 +191,21 @@ export function Studio({
     if (payload.length === 0) return;
     patch({ exporting: true, error: null });
     try {
-      const { files } = await exportFiles({
+      const out = await exportFiles({
         groups: payload,
+        sessionId: s.exportSessionId,
         brightness: s.brightness,
         headScales: s.headScales,
         sharpen: s.sharpen,
         sheet: s.sheet,
         sheetDocId: s.sheetDocId ?? s.primary,
       });
-      patch({ files, exporting: false, screen: "done" });
+      patch({
+        files: out.files,
+        exportSessionId: out.sessionId,
+        exporting: false,
+        screen: "done",
+      });
     } catch (e) {
       patch({ exporting: false, error: (e as Error).message });
     }
@@ -456,7 +462,14 @@ export function Studio({
           ) : null}
 
           {flow === "id" && s.screen === "done" && s.files ? (
-            <Done t={t} lang={lang} files={s.files} onAgain={reset} />
+            <Done
+              t={t}
+              lang={lang}
+              files={s.files}
+              sessionId={s.exportSessionId}
+              onFiles={(files) => patch({ files })}
+              onAgain={reset}
+            />
           ) : null}
           </div>
         </main>

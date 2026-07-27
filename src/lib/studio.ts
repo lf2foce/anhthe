@@ -85,6 +85,8 @@ export interface StudioState {
   sheet: boolean;
   sheetDocId: string | null;
   files: ExportedFile[] | null;
+  /** Phiên xuất file — gom ảnh cùng lượt vào một thư mục trên kho */
+  exportSessionId: string | null;
   exporting: boolean;
 
   error: string | null;
@@ -109,6 +111,7 @@ export const INITIAL: StudioState = {
   sheet: true,
   sheetDocId: null,
   files: null,
+  exportSessionId: null,
   exporting: false,
   error: null,
 };

@@ -1,22 +1,48 @@
 "use client";
 
 import { useState } from "react";
-import { downloadDataUrl, formatBytes } from "@/lib/capture";
+import { downloadUrl, fetchBlob, formatBytes } from "@/lib/capture";
 import type { Copy, Lang } from "@/lib/i18n";
 import type { ExportedFile } from "@/app/api/export/route";
+import { unlockImage } from "@/lib/api";
+import { UnlockPanel } from "@/components/UnlockPanel";
 import { ErrorNote, PrimaryButton } from "@/components/ui";
 
 export function Done({
   t,
   lang,
   files,
+  sessionId,
+  onFiles,
   onAgain,
 }: {
   t: Copy;
   lang: Lang;
   files: ExportedFile[];
+  sessionId: string | null;
+  /** Cập nhật lại danh sách sau khi mở khoá */
+  onFiles: (files: ExportedFile[]) => void;
   onAgain: () => void;
 }) {
+  const lockedCount = files.filter((f) => !f.img.unlocked).length;
+
+  /** Ảnh nào xin link sạch không được thì giữ nguyên bản xem thử */
+  async function unlockAll() {
+    if (!sessionId) return;
+    onFiles(
+      await Promise.all(
+        files.map(async (f) => {
+          if (f.img.unlocked) return f;
+          try {
+            const { url } = await unlockImage({ key: f.img.key, sessionId });
+            return { ...f, img: { ...f.img, url, unlocked: true } };
+          } catch {
+            return f;
+          }
+        })
+      )
+    );
+  }
   const [zipping, setZipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,12 +54,13 @@ export function Done({
       // trong bundle của cả 6 màn.
       const { default: JSZip } = await import("jszip");
       const zip = new JSZip();
-      for (const f of files) {
-        zip.file(f.name, f.dataUrl.split(",")[1], { base64: true });
-      }
+      // Tải hết về TRƯỚC rồi mới gói: lỗi mạng giữa chừng mà đưa Promise thẳng
+      // cho jszip thì ra file zip thiếu ảnh mà không ai biết.
+      const blobs = await Promise.all(files.map((f) => fetchBlob(f.img.url)));
+      blobs.forEach((b, i) => zip.file(files[i].name, b));
       const blob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(blob);
-      downloadDataUrl(url, "anh-the.zip");
+      downloadUrl(url, "anh-the.zip");
       URL.revokeObjectURL(url);
     } catch (e) {
       setError((e as Error).message);
@@ -66,7 +93,7 @@ export function Done({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={f.dataUrl}
+              src={f.img.url}
               alt=""
               className="h-[38px] w-[28px] flex-none rounded object-cover"
             />
@@ -84,7 +111,7 @@ export function Done({
               ) : null}
             </div>
             <button
-              onClick={() => downloadDataUrl(f.dataUrl, f.name)}
+              onClick={() => downloadUrl(f.img.url, f.name)}
               className="rounded-full px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider text-g200 shadow-[inset_0_0_0_1.5px_rgba(240,250,225,.45)]"
             >
               {t.downloadOne}
@@ -102,6 +129,15 @@ export function Done({
       ) : null}
 
       {error ? <ErrorNote>{error}</ErrorNote> : null}
+
+      {sessionId && lockedCount > 0 ? (
+        <UnlockPanel
+          sessionId={sessionId}
+          planId="id-set"
+          lockedCount={lockedCount}
+          onUnlocked={unlockAll}
+        />
+      ) : null}
 
       <div className="mt-auto flex flex-col gap-2.5 pt-2">
         <PrimaryButton onClick={downloadAll} tone="cream" disabled={zipping}>

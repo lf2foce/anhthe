@@ -53,7 +53,15 @@ phát là mất dấu. Test canh tính chất đúng: không cắt ra được *
 nào sạch dấu. Nhớ: watermark là công cụ CHUYỂN ĐỔI, không kiểm soát chi phí —
 tiền model đã tiêu trước khi có tấm ảnh nào để đóng dấu; chốt chi phí là `gate.ts`.
 
-Thu tiền (`src/lib/orders.ts`): VietQR + mã memo, đối soát tay bằng `markPaid`.
+Cả HAI luồng đều đi qua kho: `/api/generate`, `/api/refine` và `/api/export`.
+`/api/export` không gọi model nên **không trừ lượt** — nó chỉ cần biết khách là ai
+để đặt khoá object.
+
+Thu tiền (`src/lib/orders.ts`): VietQR + mã memo, đối soát tay. Đối soát xong thì
+`POST /api/admin/mark-paid` với header `x-admin-token`; không đặt `PHOTO_ADMIN_TOKEN`
+thì route tắt hẳn (mặc định mở là ai cũng đánh dấu đã trả tiền hộ nhau được).
+Mặt tiền là `UnlockPanel` — hiện ở màn Hoàn tất và màn kết quả sáng tạo, tức đúng
+chỗ khách đang nhìn ảnh mình thích, không phải trước khi khách thấy gì.
 Không cổng thanh toán, không webhook — đừng xây quầy thu ngân cho cửa hàng chưa
 có khách. `/api/unlock` cấp link bản sạch, và kiểm HAI thứ: khoá có thuộc về
 khách này không (`ownsKey` — đây là ảnh khuôn mặt, khoá khó đoán không phải

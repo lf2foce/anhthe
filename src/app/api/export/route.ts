@@ -17,7 +17,9 @@ import {
   type DocSpec,
 } from "@/lib/docs";
 import { computeCrop, extendToFit, type FaceLandmarks } from "@/lib/geometry";
-import { decodeDataUrl, bufferToDataUrl } from "@/lib/imageio";
+import { decodeDataUrl } from "@/lib/imageio";
+import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
+import { remainingFor } from "@/lib/gate";
 import {
   BACKGROUND_TOLERANCE,
   backgroundDeviation,
@@ -40,7 +42,8 @@ export interface ExportedFile {
   width: number;
   height: number;
   bytes: number;
-  dataUrl: string;
+  /** Ảnh trên kho: url xem được, key để mở khoá sau khi trả tiền */
+  img: StoredImage;
   /** Ảnh gốc thiếu điểm ảnh, đã phải phóng to */
   upscaled: boolean;
   /** Vi phạm hình học / nền còn lại sau khi crop */
@@ -64,6 +67,8 @@ interface Body {
   sharpen?: boolean;
   sheet?: boolean;
   sheetDocId?: string;
+  /** Gom file của cùng một lượt xuất vào một thư mục */
+  sessionId?: string;
 }
 
 function validLandmarks(lm: unknown): lm is FaceLandmarks {
@@ -173,6 +178,13 @@ export async function POST(request: Request) {
     return Response.json({ error: resolved.error }, { status: 400 });
   }
 
+  // Không gọi model nên KHÔNG trừ lượt — chỉ cần biết khách là ai để đặt khoá.
+  const { clientId } = await remainingFor(request);
+  const sessionId =
+    typeof body.sessionId === "string" && /^[a-f0-9]{16}$/.test(body.sessionId)
+      ? body.sessionId
+      : newSessionId();
+
   const brightness = clampNum(body.brightness, -30, 30, 0);
   const headScaleOf = (docId: string) =>
     clampNum(body.headScales?.[docId], 0.85, 1.15, 1);
@@ -246,7 +258,12 @@ export async function POST(request: Request) {
           width: photo.width,
           height: photo.height,
           bytes: photo.buffer.length,
-          dataUrl: bufferToDataUrl(photo.buffer, "image/jpeg"),
+          img: await storeImage({
+            clientId,
+            sessionId,
+            name: `anh-the-${spec.id}`,
+            buffer: photo.buffer,
+          }),
           upscaled: photo.upscaled,
           warnings,
         });
@@ -304,13 +321,18 @@ export async function POST(request: Request) {
         width: sheet.width,
         height: sheet.height,
         bytes: sheet.buffer.length,
-        dataUrl: bufferToDataUrl(sheet.buffer, "image/jpeg"),
+        img: await storeImage({
+          clientId,
+          sessionId,
+          name: `ban-in-ghep-${sheetSpec.id}`,
+          buffer: sheet.buffer,
+        }),
         upscaled: printPhoto.upscaled,
         warnings: [],
       });
     }
 
-    return Response.json({ files });
+    return Response.json({ files, sessionId });
   } catch (e) {
     console.error("[api/export]", e);
     return Response.json({ error: (e as Error).message }, { status: 500 });

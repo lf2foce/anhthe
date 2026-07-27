@@ -13,7 +13,7 @@
  */
 
 import { useRef, useState } from "react";
-import { generateImages, refineImage } from "@/lib/api";
+import { generateImages, refineImage, unlockImage } from "@/lib/api";
 import { downloadUrl, fetchBlob } from "@/lib/capture";
 import type { StoredImage } from "@/lib/storage";
 import {
@@ -26,6 +26,7 @@ import {
 } from "@/lib/packs";
 import type { Copy, Lang } from "@/lib/i18n";
 import { Capture } from "@/components/screens/Capture";
+import { UnlockPanel } from "@/components/UnlockPanel";
 import {
   BackBar,
   ErrorNote,
@@ -73,6 +74,28 @@ export function CreativeStudio({
 
   const pack = getPack(packId ?? "") ?? null;
   const selected = shots[sel] ?? null;
+  const lockedCount = shots.filter((s) => !s.img.unlocked).length;
+
+  /**
+   * Đổi mọi ảnh đang khoá sang link bản sạch. Gọi sau khi đơn chuyển "đã trả".
+   * Ảnh nào xin không được thì GIỮ NGUYÊN bản xem thử — thà thấy chữ chìm còn
+   * hơn thấy ảnh vỡ.
+   */
+  async function unlockAll() {
+    if (!sessionId) return;
+    const next = await Promise.all(
+      shots.map(async (shot) => {
+        if (shot.img.unlocked) return shot;
+        try {
+          const { url } = await unlockImage({ key: shot.img.key, sessionId });
+          return { ...shot, img: { ...shot.img, url, unlocked: true } };
+        } catch {
+          return shot;
+        }
+      })
+    );
+    setShots(next);
+  }
 
   /**
    * Đời của LÔ ảnh (tăng khi thay lô) và của LƯỢT tạo. Người dùng được tự do bấm
@@ -236,6 +259,11 @@ export function CreativeStudio({
               </span>
             </div>
           ) : null}
+          {selected && !selected.img.unlocked ? (
+            <span className="absolute left-2.5 top-2.5 rounded-full bg-n900/85 px-2.5 py-1 text-[10.5px] font-bold text-a300 backdrop-blur">
+              Bản xem thử
+            </span>
+          ) : null}
           {selected && !selected.busy ? (
             <div className="absolute bottom-2.5 right-2.5 flex gap-1.5">
               <button
@@ -360,6 +388,15 @@ export function CreativeStudio({
               sub={t.qualityHighSub}
             />
           </div>
+        ) : null}
+
+        {sessionId && lockedCount > 0 && !generating ? (
+          <UnlockPanel
+            sessionId={sessionId}
+            planId="creative"
+            lockedCount={lockedCount}
+            onUnlocked={unlockAll}
+          />
         ) : null}
 
         {shots.length > 1 && !generating ? (

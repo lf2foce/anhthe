@@ -56,8 +56,25 @@ export function exportFiles(opts: {
   sharpen: boolean;
   sheet: boolean;
   sheetDocId: string | null;
-}): Promise<{ files: ExportedFile[] }> {
-  return post<{ files: ExportedFile[] }>("/api/export", opts);
+  sessionId: string | null;
+}): Promise<{ files: ExportedFile[]; sessionId: string }> {
+  return post("/api/export", opts);
+}
+
+/** Tạo/lấy đơn cho một phiên — trả mã memo và link QR */
+export function createOrder(opts: {
+  sessionId: string;
+  planId: string;
+}): Promise<{ memo: string; amountVnd: number; status: string; qrUrl: string }> {
+  return post("/api/order", opts);
+}
+
+/** Xin link bản SẠCH cho một ảnh; 402 nếu phiên chưa trả tiền */
+export function unlockImage(opts: {
+  key: string;
+  sessionId: string;
+}): Promise<{ url: string }> {
+  return post("/api/unlock", opts);
 }
 
 /** Studio sáng tạo: sinh `count` biến thể theo một phong cách */
