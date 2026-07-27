@@ -8,8 +8,8 @@ import "server-only";
  */
 
 import sharp from "sharp";
-import { mmToPx, outputSize, type DocSpec } from "./docs";
-import type { CropBox } from "./geometry";
+import { bgHex, mmToPx, outputSize, type DocSpec } from "./docs";
+import type { CanvasPad, CropBox } from "./geometry";
 
 /** Khổ ảnh 10×15 (4R) */
 const SHEET_W_MM = 102;
@@ -23,6 +23,18 @@ export function brightnessMultiplier(value: number): number {
   return 1 + value / 140;
 }
 
+/**
+ * Làm nét bằng tích chập (unsharp mask), CỐ Ý không dùng model sinh ảnh.
+ *
+ * Upscale sinh ảnh "làm nét" bằng cách BỊA THÊM chi tiết mặt — lỗ chân lông, lông
+ * mi, gọng kính nó tưởng là có. Trên ảnh giấy tờ tuỳ thân đó là sửa nội dung ảnh
+ * nhận dạng. Tích chập chỉ tăng tương phản cục bộ trên chi tiết ĐANG CÓ, nên nó
+ * không thêm gì vào ảnh và lặp lại y hệt mỗi lần chạy.
+ *
+ * Mức nhẹ: mục tiêu là bù lại độ mềm do resize, không phải tạo cảm giác "nét hơn thật".
+ */
+const SHARPEN = { sigma: 1, m1: 0.6, m2: 1.6 } as const;
+
 export interface RenderedPhoto {
   buffer: Buffer;
   width: number;
@@ -35,10 +47,18 @@ export async function renderSingle(
   input: Buffer,
   crop: CropBox,
   spec: DocSpec,
-  opts: { brightness?: number; variant?: "print" | "digital" } = {}
+  opts: {
+    brightness?: number;
+    variant?: "print" | "digital";
+    /** Nền chuẩn đã resolve cho spec này; mặc định là nền đầu tiên spec cho phép */
+    backgroundHex?: string;
+    /** Làm nét bằng tích chập — KHÔNG bịa thêm chi tiết, xem `SHARPEN` */
+    sharpen?: boolean;
+  } = {}
 ): Promise<RenderedPhoto> {
   const target = outputSize(spec, opts.variant ?? "print");
   const brightness = brightnessMultiplier(opts.brightness ?? 0);
+  const background = opts.backgroundHex ?? bgHex(spec.backgrounds[0]);
 
   let pipeline = sharp(input).extract({
     left: crop.left,
@@ -49,9 +69,17 @@ export async function renderSingle(
 
   if (brightness !== 1) pipeline = pipeline.modulate({ brightness });
 
-  const buffer = await pipeline
+  // `flatten` chỉ ghép kênh alpha nếu có — ảnh JPEG vào đây không có alpha nên
+  // đây là chốt phòng khi model trả PNG trong suốt, KHÔNG phải chỗ tạo ra nền.
+  // Nền thật do bước thay nền quyết định; `backgroundDeviation` kiểm lại sau đó.
+  pipeline = pipeline
     .resize(target.width, target.height, { fit: "fill" })
-    .flatten({ background: spec.background })
+    .flatten({ background });
+
+  // Làm nét SAU khi resize: làm trước thì phép resize bôi lại phần vừa làm nét.
+  if (opts.sharpen) pipeline = pipeline.sharpen(SHARPEN);
+
+  const buffer = await pipeline
     .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
     .withDensity(spec.dpi)
     .toBuffer();
@@ -163,4 +191,125 @@ export async function imageSize(
   const meta = await sharp(input).metadata();
   if (!meta.width || !meta.height) throw new Error("Không đọc được kích thước ảnh.");
   return { width: meta.width, height: meta.height };
+}
+
+/**
+ * Nới canvas theo kế hoạch của `extendToFit`: chỉ thêm NỀN đúng màu chuẩn quanh
+ * ảnh, không đụng một pixel nào của người. Phần số học (nới bao nhiêu, landmark
+ * mới ở đâu) nằm ở geometry.ts — đây chỉ là thao tác sharp thuần.
+ */
+export async function sharpExtend(
+  input: Buffer,
+  pad: CanvasPad,
+  backgroundHex: string
+): Promise<Buffer> {
+  return sharp(input)
+    .extend({
+      top: pad.top,
+      left: pad.left,
+      right: pad.right,
+      bottom: pad.bottom,
+      background: backgroundHex,
+    })
+    .jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+}
+
+/** Lệch màu tối đa cho phép trên một kênh (0–255) trước khi coi là sai nền */
+export const BACKGROUND_TOLERANCE = 18;
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  const full =
+    h.length === 3
+      ? h
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : h;
+  return [
+    parseInt(full.slice(0, 2), 16),
+    parseInt(full.slice(2, 4), 16),
+    parseInt(full.slice(4, 6), 16),
+  ];
+}
+
+/**
+ * Màu trung bình của một vùng, tính từ pixel thô.
+ *
+ * CỐ Ý không dùng `sharp().stats()`: `stats()` đo ẢNH ĐẦU VÀO và bỏ qua `extract()`
+ * đứng trước nó, nên `extract(góc).stats()` trả về trung bình CẢ ẢNH. Với ảnh thẻ —
+ * phần lớn diện tích là mặt và áo — con số đó không nói gì về nền.
+ */
+async function regionMean(
+  input: Buffer,
+  region: { left: number; top: number; width: number; height: number }
+): Promise<[number, number, number]> {
+  const { data, info } = await sharp(input)
+    .extract(region)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const count = info.width * info.height;
+  const sums = [0, 0, 0];
+  for (let i = 0; i < count; i++) {
+    const at = i * info.channels;
+    sums[0] += data[at];
+    sums[1] += data[at + 1];
+    sums[2] += data[at + 2];
+  }
+  return [sums[0] / count, sums[1] / count, sums[2] / count];
+}
+
+/**
+ * Nền của ảnh thành phẩm có ĐÚNG màu chuẩn không — trả về lệch tối đa trên một
+ * kênh (0–255).
+ *
+ * Đây là compliance bằng số học, không phải quan sát của model: model được YÊU CẦU
+ * thay nền sang đúng hex nhưng vẫn có thể trả về lệch tông, hoặc chỉ đổi nền quanh
+ * đầu mà để nguyên phần còn lại. Tiêu chí `background_even` của model chỉ nói nền
+ * có ĐỀU không, không nói nền có ĐÚNG MÀU không.
+ *
+ * Vùng đo là hai DẢI DỌC sát mép trái/phải, từ đỉnh ảnh xuống tới đường cằm:
+ *
+ * - Chỉ lấy hai bên vì cột giữa là đầu và thân người.
+ * - Chỉ lấy phần trên đường cằm vì dưới cằm là vai và áo, không phải nền.
+ * - Dải dọc (không phải ô vuông ở góc) vì model hay đổi nền quanh đầu rồi bỏ sót
+ *   phần thấp hơn — chỉ đo góc trên là bỏ lọt đúng ca đó.
+ *
+ * Lấy giá trị NHỎ HƠN của hai dải: tóc rộng có thể tràn vào một bên, nhưng nếu nền
+ * sai màu thì cả hai bên đều lệch, nên min không làm mất trường hợp sai.
+ *
+ * Giới hạn đã biết: nền sai ở phần DƯỚI cằm thì hàm này không thấy — vùng đó không
+ * phân biệt được với áo.
+ *
+ * @param chinFraction vị trí đường cằm theo chiều cao ảnh (0–1). Thiếu thì lấy 0.5,
+ *        tức chỉ đo nửa trên — an toàn nhưng bỏ lọt nhiều hơn.
+ */
+export async function backgroundDeviation(
+  input: Buffer,
+  expectedHex: string,
+  opts: { chinFraction?: number } = {}
+): Promise<number> {
+  const want = hexToRgb(expectedHex);
+  const { width, height } = await imageSize(input);
+
+  const stripW = Math.max(2, Math.round(width * 0.1));
+  const chin = Math.min(0.95, Math.max(0.2, opts.chinFraction ?? 0.5));
+  const stripH = Math.max(2, Math.round(height * chin));
+  if (stripW * 2 > width || stripH > height) return 0;
+
+  const strips = [
+    { left: 0, top: 0, width: stripW, height: stripH },
+    { left: width - stripW, top: 0, width: stripW, height: stripH },
+  ];
+
+  const deviations = await Promise.all(
+    strips.map(async (strip) => {
+      const got = await regionMean(input, strip);
+      return Math.max(...got.map((v, i) => Math.abs(v - want[i])));
+    })
+  );
+
+  return Math.min(...deviations);
 }

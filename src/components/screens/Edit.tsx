@@ -1,7 +1,14 @@
 "use client";
 
-import { BACKGROUNDS, getDoc, type BackgroundId, type DocSpec } from "@/lib/docs";
-import { computeCrop } from "@/lib/geometry";
+import {
+  BACKGROUNDS,
+  bgHex,
+  getDoc,
+  type BackgroundGroup,
+  type BackgroundId,
+  type DocSpec,
+} from "@/lib/docs";
+import { computeCrop, extendToFit } from "@/lib/geometry";
 import type { Copy, Lang } from "@/lib/i18n";
 import type { Working } from "@/lib/studio";
 import { CropPreview } from "@/components/CropPreview";
@@ -12,53 +19,62 @@ export function Edit({
   lang,
   working,
   spec,
-  picked,
-  previewDocId,
-  onPreviewDoc,
   bg,
+  allowed,
+  groups,
+  pendingCount,
+  failedBackgrounds,
   brightness,
   headScale,
   smooth,
-  retouched,
+  sharpen,
   retouching,
   error,
   onBg,
   onBrightness,
   onHeadScale,
   onSmooth,
+  onSharpen,
   onRetouch,
+  onRetryBg,
   onBack,
   onNext,
 }: {
   t: Copy;
   lang: Lang;
   working: Working;
+  /** Loại giấy tờ tấm ảnh được canh cho — màn này chỉ chỉnh cho đúng nó */
   spec: DocSpec;
-  picked: string[];
-  previewDocId: string;
-  onPreviewDoc: (id: string) => void;
+  /** Nền đã resolve cho spec đang canh */
   bg: BackgroundId;
+  /** Nền mà ít nhất một loại đang chọn cho phép */
+  allowed: BackgroundId[];
+  groups: BackgroundGroup[];
+  pendingCount: number;
+  /** Nhóm đã chạy thay nền nhưng đo ra nền VẪN sai màu */
+  failedBackgrounds: BackgroundId[];
   brightness: number;
   headScale: number;
   smooth: boolean;
-  retouched: boolean;
+  sharpen: boolean;
   retouching: boolean;
   error: string | null;
   onBg: (id: BackgroundId) => void;
   onBrightness: (v: number) => void;
   onHeadScale: (v: number) => void;
   onSmooth: (v: boolean) => void;
+  onSharpen: (v: boolean) => void;
   onRetouch: () => void;
+  onRetryBg: () => void;
   onBack: () => void;
   onNext: () => void;
 }) {
-  const fit = computeCrop(
-    working.landmarks,
-    working.width,
-    working.height,
-    spec,
-    headScale
-  );
+  // Cùng phép nới ảo với preview/evaluate/export — bốn nơi phải kể một câu chuyện.
+  const plan = extendToFit(working.landmarks, working.width, working.height, [spec], {
+    [spec.id]: headScale,
+  });
+  const fit = computeCrop(plan.landmarks, plan.width, plan.height, spec, headScale);
+  const doneCount = groups.length - pendingCount;
 
   return (
     <div className="screen-in isolate flex h-full min-h-0 flex-col overflow-hidden bg-n900">
@@ -70,6 +86,7 @@ export function Edit({
             imgW={working.width}
             imgH={working.height}
             spec={spec}
+            backgroundHex={bgHex(bg)}
             headScale={headScale}
             brightness={brightness}
             guides
@@ -77,10 +94,12 @@ export function Edit({
             className="mx-auto h-full"
           />
         </div>
+        {/* Nút này nằm ĐÈ lên ảnh, nên nền mờ 55% biến nó thành vô hình trên ảnh
+            sáng. Dùng nền đặc + viền sáng + đổ bóng để nổi trên mọi ảnh. */}
         <button
           onClick={onBack}
           aria-label={t.back}
-          className="absolute left-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-n900/55 text-[15px] text-n100 backdrop-blur"
+          className="absolute left-3.5 top-3.5 grid h-10 w-10 place-items-center rounded-full bg-n900/85 text-[17px] font-bold text-n100 shadow-[0_2px_10px_rgba(0,0,0,.45)] ring-[1.5px] ring-n100/45 backdrop-blur-sm"
         >
           ←
         </button>
@@ -92,28 +111,14 @@ export function Edit({
       <div className="scr relative z-0 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-t-[30px] bg-bg px-5 pb-6 pt-5 text-ink">
         <span className="mx-auto h-1 w-11 flex-none rounded-full bg-n400" />
 
-        {picked.length > 1 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {picked.map((id) => {
-              const d = getDoc(id);
-              if (!d) return null;
-              const on = id === previewDocId;
-              return (
-                <button
-                  key={id}
-                  onClick={() => onPreviewDoc(id)}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${
-                    on
-                      ? "bg-n900 text-n100"
-                      : "text-n700 shadow-[inset_0_0_0_1.5px_var(--color-neutral-400)]"
-                  }`}
-                >
-                  {lang === "vi" ? d.vi : d.en}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
+        {/* Nói rõ đang canh cho loại nào. Thanh trượt tỉ lệ đầu dưới đây chỉ tác
+            động lên loại này — các cỡ khác tự canh theo target riêng của chúng. */}
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-[13px] font-bold">
+            {lang === "vi" ? spec.vi : spec.en}
+          </span>
+          <span className="text-[10.5px] text-n600">{spec.dim}</span>
+        </div>
 
         <div className="flex flex-col gap-2">
           <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-n600">
@@ -121,12 +126,17 @@ export function Edit({
           </span>
           <div className="flex gap-2.5">
             {BACKGROUNDS.map((b) => {
+              // Nền nào không loại nào cho phép thì không bấm được — chuẩn giấy
+              // tờ quyết định, không phải sở thích.
+              const usable = allowed.includes(b.id);
               const on = bg === b.id;
               return (
                 <button
                   key={b.id}
                   onClick={() => onBg(b.id)}
-                  className="relative flex flex-1 items-center gap-2 rounded-full px-2.5 py-2 shadow-[inset_0_0_0_1.5px_var(--color-neutral-300)]"
+                  disabled={!usable}
+                  aria-pressed={on}
+                  className="relative flex flex-1 items-center gap-2 rounded-full px-2.5 py-2 shadow-[inset_0_0_0_1.5px_var(--color-neutral-300)] disabled:opacity-35"
                 >
                   <span
                     className="h-[18px] w-[18px] flex-none rounded-full shadow-[inset_0_0_0_1px_var(--color-neutral-400)]"
@@ -142,6 +152,37 @@ export function Edit({
               );
             })}
           </div>
+
+          <p className="m-0 text-[10.5px] leading-snug text-n600">{t.bgRule}</p>
+
+          {/* Nhóm nền: nói thẳng loại nào ra nền nào, vì đây là chỗ dễ nhận file
+              sai nền nhất khi chọn nhiều loại cùng lúc. */}
+          {groups.length > 1 ? (
+            <ul className="m-0 flex flex-col gap-1 pl-0 text-[10.5px] text-n700">
+              {groups.map((g) => {
+                const label = BACKGROUNDS.find((b) => b.id === g.background);
+                return (
+                  <li key={g.background} className="flex items-center gap-2">
+                    <span
+                      className="h-3 w-3 flex-none rounded-full shadow-[inset_0_0_0_1px_var(--color-neutral-400)]"
+                      style={{ background: g.hex }}
+                    />
+                    <span className="font-semibold">
+                      {lang === "vi" ? label?.vi : label?.en}
+                    </span>
+                    <span className="text-n600">
+                      {g.docIds
+                        .map((id) => {
+                          const d = getDoc(id);
+                          return lang === "vi" ? d?.vi : d?.en;
+                        })
+                        .join(", ")}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -184,22 +225,50 @@ export function Edit({
           </label>
 
           <Toggle on={smooth} onChange={onSmooth} label={t.smooth} />
+          <Toggle
+            on={sharpen}
+            onChange={onSharpen}
+            label={t.sharpen}
+            sub={t.sharpenSub}
+          />
         </div>
 
         {error ? <ErrorNote>{error}</ErrorNote> : null}
 
         {retouching ? (
-          <Spinner label={t.applying} />
-        ) : retouched ? (
+          <Spinner
+            label={
+              groups.length > 1
+                ? `${t.applying} (${doneCount + 1}/${groups.length})`
+                : t.applying
+            }
+          />
+        ) : failedBackgrounds.length ? (
+          // Đã tốn một lần gọi model nhưng nền đo ra vẫn sai — KHÔNG được hiện dấu
+          // tích xanh, vì người dùng sẽ chỉ biết khi bị trả ở quầy.
+          <div className="flex flex-col gap-2">
+            <div className="flex items-start gap-2 text-[12px] font-semibold leading-snug text-a700">
+              <span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-accent text-[11px] text-white">
+                !
+              </span>
+              {t.bgNotApplied}
+            </div>
+            <GhostButton onClick={onRetryBg} dark={false}>
+              {t.bgRetry}
+            </GhostButton>
+          </div>
+        ) : pendingCount === 0 ? (
           <div className="flex items-center gap-2 text-[12px] font-semibold text-g700">
             <span className="grid h-5 w-5 place-items-center rounded-full bg-g500 text-[11px] text-white">
               ✓
             </span>
-            {t.bgDone}
+            {groups.length > 1
+              ? `${t.bgDone} · ${groups.length} ${lang === "vi" ? "nền" : "backgrounds"}`
+              : t.bgDone}
           </div>
         ) : (
           <GhostButton onClick={onRetouch} dark={false}>
-            {t.applyBg}
+            {pendingCount > 1 ? `${t.applyBg} (${pendingCount}×)` : t.applyBg}
           </GhostButton>
         )}
 

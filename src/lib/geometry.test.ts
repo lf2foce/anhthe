@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeCrop, resolutionCheck, type FaceLandmarks } from "./geometry";
-import { getDoc, outputSize, type DocSpec } from "./docs";
+import {
+  computeCrop,
+  extendToFit,
+  resolutionCheck,
+  type FaceLandmarks,
+} from "./geometry";
+import { DOCS, getDoc, outputSize, type DocSpec } from "./docs";
 
 const us = getDoc("us")!;
 const vn34 = getDoc("vn34")!;
@@ -75,17 +80,122 @@ describe("computeCrop", () => {
   });
 });
 
+describe("extendToFit", () => {
+  const link = getDoc("link")!;
+
+  /** Ảnh chụp quá sát: đầu chiếm 64% chiều cao, sát mép trên — đúng ca ở ảnh thật */
+  const tight = { crownY: 0.06, chinY: 0.7, eyeMidY: 0.28, faceCenterX: 0.5 };
+
+  it("ảnh đã đủ rộng thì không nới gì", () => {
+    const roomy = { crownY: 0.12, chinY: 0.47, eyeMidY: 0.22, faceCenterX: 0.5 };
+    const plan = extendToFit(roomy, 2000, 2667, [getDoc("vn34")!]);
+    expect(plan.needed).toBe(false);
+    expect(plan.pad).toEqual({ top: 0, left: 0, right: 0, bottom: 0 });
+    expect(plan.landmarks).toEqual(roomy);
+  });
+
+  /**
+   * Điều kiện đúng đắn của cả tính năng: sau khi nới, computeCrop trên ảnh MỚI phải
+   * hết lỗi. Nếu không thì nới xong vẫn trượt chuẩn, tính năng vô nghĩa.
+   */
+  it("sau khi nới thì computeCrop KHÔNG còn lỗi nào", () => {
+    const before = computeCrop(tight, 1200, 1600, link);
+    expect(before.errors.length).toBeGreaterThan(0);
+
+    const plan = extendToFit(tight, 1200, 1600, [link]);
+    expect(plan.needed).toBe(true);
+
+    const after = computeCrop(plan.landmarks, plan.width, plan.height, link);
+    expect(after.errors).toEqual([]);
+    expect(after.headRatio).toBeCloseTo(link.headRatio.target, 2);
+    expect(after.eyeFromBottom).toBeCloseTo(link.eyeFromBottom.target, 2);
+  });
+
+  it("nới đủ cho MỌI spec được truyền vào, không chỉ spec khó nhất", () => {
+    const specs = DOCS.slice();
+    const plan = extendToFit(tight, 1200, 1600, specs);
+    for (const spec of specs) {
+      const r = computeCrop(plan.landmarks, plan.width, plan.height, spec);
+      expect(r.errors, `spec ${spec.id}`).toEqual([]);
+    }
+  });
+
+  it("landmark mới trỏ đúng vào cùng điểm ảnh cũ — chỉ là phép dịch", () => {
+    const plan = extendToFit(tight, 1200, 1600, [link]);
+    // Cùng một pixel: toạ độ tuyệt đối phải khớp sau khi trừ padding.
+    expect(plan.landmarks.crownY * plan.height - plan.pad.top).toBeCloseTo(
+      tight.crownY * 1600,
+      6
+    );
+    expect(plan.landmarks.chinY * plan.height - plan.pad.top).toBeCloseTo(
+      tight.chinY * 1600,
+      6
+    );
+    expect(plan.landmarks.faceCenterX * plan.width - plan.pad.left).toBeCloseTo(
+      tight.faceCenterX * 1200,
+      6
+    );
+  });
+
+  it("chiều cao đầu tính bằng pixel KHÔNG đổi — nới nền không tạo thêm chi tiết", () => {
+    const before = computeCrop(tight, 1200, 1600, link);
+    const plan = extendToFit(tight, 1200, 1600, [link]);
+    const after = computeCrop(plan.landmarks, plan.width, plan.height, link);
+    expect(after.headPx).toBeCloseTo(before.headPx, 4);
+  });
+
+  it("mặt lệch sang một bên thì nới lệch theo, không nới đều hai bên", () => {
+    const offCenter = { ...tight, faceCenterX: 0.2 };
+    const plan = extendToFit(offCenter, 1200, 1600, [link]);
+    expect(plan.pad.left).toBeGreaterThan(plan.pad.right);
+  });
+
+  it("landmark vô lý thì không nới, thay vì nới bừa", () => {
+    const bad = { crownY: 0.7, chinY: 0.2, eyeMidY: 0.4, faceCenterX: 0.5 };
+    expect(extendToFit(bad, 1200, 1600, [link]).needed).toBe(false);
+  });
+
+  it("không spec nào thì không nới", () => {
+    expect(extendToFit(tight, 1200, 1600, []).needed).toBe(false);
+  });
+});
+
+describe("nới khung không làm sai phép đo độ phân giải", () => {
+  /**
+   * Nghi vấn tự nhiên: nới khung bằng nền giả có làm resolutionCheck "đạt oan" không?
+   * KHÔNG — vì sau khi nới, cropH = headPx / ratio, nên cropH ≥ targetH tương đương
+   * headPx ≥ ratio × targetH: đo theo khung sau khi nới CHÍNH LÀ đo theo đầu.
+   * Test này đóng băng điều đó bằng một ca đầu thật sự thiếu pixel.
+   */
+  it("ảnh thiếu px thì sau khi nới VẪN thiếu px", () => {
+    // Ảnh nhỏ 600×800, đầu 512px — cần 0.5×1200 = 600px cho bản digital LinkedIn.
+    const tight = { crownY: 0.06, chinY: 0.7, eyeMidY: 0.28, faceCenterX: 0.5 };
+    const link = getDoc("link")!;
+    const target = outputSize(link, "digital");
+
+    const before = computeCrop(tight, 600, 800, link);
+    expect(resolutionCheck(before.crop, target).ok).toBe(false);
+
+    const plan = extendToFit(tight, 600, 800, [link]);
+    expect(plan.needed).toBe(true);
+    const after = computeCrop(plan.landmarks, plan.width, plan.height, link);
+    expect(after.errors).toEqual([]);
+    // Khung đã đủ rộng để đúng chuẩn hình học, nhưng pixel đầu không tự sinh ra.
+    expect(resolutionCheck(after.crop, target).ok).toBe(false);
+  });
+});
+
 describe("resolutionCheck", () => {
   it("phát hiện khung crop thiếu điểm ảnh so với kích thước xuất", () => {
     const target = outputSize(us, "digital");
     const small = { left: 0, top: 0, width: 300, height: 300 };
-    expect(resolutionCheck(small, us, target).ok).toBe(false);
+    expect(resolutionCheck(small, target).ok).toBe(false);
   });
 
   it("chấp nhận khi khung crop đủ lớn", () => {
     const target = outputSize(us, "digital");
     const big = { left: 0, top: 0, width: 1200, height: 1200 };
-    expect(resolutionCheck(big, us, target).ok).toBe(true);
+    expect(resolutionCheck(big, target).ok).toBe(true);
   });
 });
 

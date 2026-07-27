@@ -3,6 +3,7 @@ import "server-only";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { FaceLandmarks } from "./geometry";
 import { AI_CHECK_IDS, type AiCheckId } from "./checks";
+import type { OutfitId } from "./docs";
 
 /**
  * Lớp mỏng bọc @google/genai.
@@ -15,6 +16,13 @@ import { AI_CHECK_IDS, type AiCheckId } from "./checks";
 /** Sinh & sửa ảnh. Mặc định bản lite (nhanh, rẻ, 1K). */
 export const IMAGE_MODEL =
   process.env.GEMINI_IMAGE_MODEL ?? "gemini-3.1-flash-lite-image";
+
+/**
+ * Bản đủ sức xuất 2K — chỉ dùng cho ảnh chân dung, khi người dùng bật `hiRes`.
+ * Bản lite chỉ ra 1K nên không đủ cho ảnh in khổ lớn.
+ */
+export const IMAGE_MODEL_HIRES =
+  process.env.GEMINI_IMAGE_MODEL_HIRES ?? "gemini-3.1-flash-image";
 
 /** Đọc & chấm ảnh. Không sinh pixel nào. */
 export const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL ?? "gemini-3.5-flash-lite";
@@ -229,6 +237,15 @@ export function nearestAspectRatio(width: number, height: number): string {
   return best[0];
 }
 
+const OUTFIT_PROMPT: Record<Exclude<OutfitId, "keep">, string> = {
+  shirt:
+    "Đổi trang phục thành áo sơ mi trắng phẳng phiu, cổ áo gọn gàng, cài kín cổ.",
+  suit:
+    "Đổi trang phục thành vest tối màu lịch sự kèm áo sơ mi trắng bên trong, ve áo gọn.",
+  blazer:
+    "Đổi trang phục thành blazer lịch sự màu trung tính, bên trong áo trơn.",
+};
+
 export interface RetouchOptions {
   image: ImageInput;
   width: number;
@@ -239,9 +256,26 @@ export interface RetouchOptions {
   smooth: boolean;
   /** Sửa lệch sáng hai bên mặt do model báo */
   evenLighting: boolean;
+  /**
+   * Ba tuỳ chọn dưới đây CHỈ được bật cho ảnh chân dung. Route phải lọc qua
+   * `sanitizeRetouch` trước khi gọi vào đây — xem FAMILY_TOOLKIT ở lib/docs.ts.
+   */
+  outfit: OutfitId;
+  polish: boolean;
+  hiRes: boolean;
 }
 
-function retouchPrompt(o: RetouchOptions): string {
+/**
+ * Dựng prompt sửa ảnh.
+ *
+ * Hai chế độ khác nhau ở CHỖ CĂN BẢN, không phải mức độ: ảnh giấy tờ tuỳ thân bị
+ * cấm tường minh đổi mặt / đổi áo / đổi biểu cảm, còn ảnh chân dung thì mở những
+ * thứ đó nhưng vẫn giữ một sàn: không đổi đặc điểm nhận dạng thành người khác.
+ *
+ * Xuất ra để test được — đây là chỗ dễ nhất để một dòng cấm bị rơi mất mà không ai
+ * biết, và hậu quả chỉ hiện ra ở ảnh của khách.
+ */
+export function retouchPrompt(o: RetouchOptions): string {
   const jobs = [
     `Thay TOÀN BỘ nền phía sau người bằng màu đặc, phẳng, đúng mã hex ${o.backgroundHex}. Không gradient, không hoạ tiết, không bóng đổ lên nền.`,
     "Cắt viền sạch quanh tóc, tai và vai — giữ lại các sợi tóc mảnh, không để viền sáng hay quầng màu.",
@@ -254,17 +288,53 @@ function retouchPrompt(o: RetouchOptions): string {
     jobs.push(
       "Làm mịn da RẤT NHẸ: chỉ giảm bóng dầu và vết đỏ. Giữ nguyên lỗ chân lông, nếp nhăn, nốt ruồi, râu."
     );
+  if (o.outfit !== "keep") jobs.push(OUTFIT_PROMPT[o.outfit]);
+  if (o.polish)
+    jobs.push(
+      "Chỉnh sáng cho da đều màu và mắt trong hơn một chút. KHÔNG đổi hình dáng mắt, mũi, miệng hay đường viền mặt."
+    );
+  if (o.hiRes)
+    jobs.push(
+      "Xuất ở độ phân giải cao nhất có thể, chi tiết rõ và sạch nhiễu, không làm ảnh trông như vẽ lại."
+    );
 
-  return `Đây là ảnh dùng làm ảnh thẻ/hộ chiếu. Sửa ảnh theo đúng các việc sau và KHÔNG làm gì thêm:
+  const portraitMode = o.outfit !== "keep" || o.polish || o.hiRes;
+
+  // Sàn chung cho CẢ HAI chế độ: ảnh phải vẫn là người đó.
+  const limits = [
+    "KHÔNG đổi khuôn mặt thành người khác: giữ nguyên đường nét, tỉ lệ, màu mắt, kiểu tóc, độ tuổi.",
+    "KHÔNG di chuyển, xoay, phóng to, thu nhỏ hay cắt cúp lại người trong khung. Người phải ở NGUYÊN vị trí và NGUYÊN kích thước như ảnh gốc.",
+    "Giữ nguyên khung hình và tỉ lệ khung của ảnh gốc.",
+  ];
+
+  if (!portraitMode) {
+    // Chỉ ảnh giấy tờ tuỳ thân mới bị siết mấy điều này.
+    limits.push(
+      "KHÔNG làm thon mặt, không mở to mắt, không đổi biểu cảm, không thêm nụ cười.",
+      "KHÔNG đổi quần áo, không thêm trang sức, không xoá nốt ruồi hay sẹo.",
+      "KHÔNG đổi cân nặng hay hình dáng cơ thể."
+    );
+  } else {
+    limits.push(
+      "KHÔNG xoá nốt ruồi, sẹo hay hình xăm trên mặt — đó là đặc điểm nhận dạng.",
+      "KHÔNG làm thon mặt, không đổi hình dáng mắt mũi miệng."
+    );
+  }
+
+  const header = portraitMode
+    ? "Đây là ảnh chân dung dùng cho hồ sơ nghề nghiệp (LinkedIn, CV). Sửa ảnh theo đúng các việc sau và KHÔNG làm gì thêm:"
+    : "Đây là ảnh dùng làm ảnh thẻ/hộ chiếu. Sửa ảnh theo đúng các việc sau và KHÔNG làm gì thêm:";
+
+  const warning = portraitMode
+    ? "RÀNG BUỘC BẮT BUỘC — ảnh phải vẫn nhận ra là chính người đó:"
+    : "RÀNG BUỘC BẮT BUỘC — vi phạm là ảnh bị từ chối ở quầy:";
+
+  return `${header}
 
 ${jobs.map((j, i) => `${i + 1}. ${j}`).join("\n")}
 
-RÀNG BUỘC BẮT BUỘC — vi phạm là ảnh bị từ chối ở quầy:
-- KHÔNG đổi khuôn mặt: không đổi hình dáng, tỉ lệ, đường nét, màu mắt, kiểu tóc, độ tuổi, cân nặng.
-- KHÔNG làm thon mặt, không mở to mắt, không đổi biểu cảm, không thêm nụ cười.
-- KHÔNG di chuyển, xoay, phóng to, thu nhỏ hay cắt cúp lại người trong khung. Người phải ở NGUYÊN vị trí và NGUYÊN kích thước như ảnh gốc.
-- KHÔNG đổi quần áo, không thêm trang sức, không xoá nốt ruồi hay sẹo.
-- Giữ nguyên khung hình và tỉ lệ khung của ảnh gốc.
+${warning}
+${limits.map((l) => `- ${l}`).join("\n")}
 
 Trả về ảnh đã sửa.`;
 }
@@ -274,22 +344,34 @@ export interface RetouchResult {
   mimeType: string;
 }
 
-export async function retouch(o: RetouchOptions): Promise<RetouchResult> {
+/** Một lần gọi model sinh ảnh: gửi ảnh + prompt, nhận về đúng một ảnh */
+async function generateImage(opts: {
+  model: string;
+  image: ImageInput;
+  prompt: string;
+  aspectRatio: string;
+  imageSize?: string;
+}): Promise<RetouchResult> {
   const res = await getClient().models.generateContent({
-    model: IMAGE_MODEL,
+    model: opts.model,
     contents: [
       {
         role: "user",
         parts: [
-          { inlineData: { mimeType: o.image.mimeType, data: o.image.data } },
-          { text: retouchPrompt(o) },
+          {
+            inlineData: {
+              mimeType: opts.image.mimeType,
+              data: opts.image.data,
+            },
+          },
+          { text: opts.prompt },
         ],
       },
     ],
     config: {
       imageConfig: {
-        aspectRatio: nearestAspectRatio(o.width, o.height),
-        ...(IMAGE_SIZE ? { imageSize: IMAGE_SIZE } : {}),
+        aspectRatio: opts.aspectRatio,
+        ...(opts.imageSize ? { imageSize: opts.imageSize } : {}),
       },
     },
   });
@@ -310,4 +392,40 @@ export async function retouch(o: RetouchOptions): Promise<RetouchResult> {
       ? `Model không trả về ảnh: ${refusal.slice(0, 200)}`
       : "Model không trả về ảnh nào."
   );
+}
+
+export async function retouch(o: RetouchOptions): Promise<RetouchResult> {
+  // Bản lite chỉ ra 1K, nên bật hiRes phải đổi CẢ model, không chỉ imageSize.
+  return generateImage({
+    model: o.hiRes ? IMAGE_MODEL_HIRES : IMAGE_MODEL,
+    image: o.image,
+    prompt: retouchPrompt(o),
+    aspectRatio: nearestAspectRatio(o.width, o.height),
+    imageSize: o.hiRes ? (IMAGE_SIZE ?? "2K") : IMAGE_SIZE,
+  });
+}
+
+// ── Studio sáng tạo: vẽ lại toàn bộ theo phong cách ────────────────────────────
+
+/**
+ * Sinh ảnh phong cách cho luồng sáng tạo. Prompt do lib/packs.ts dựng — sàn danh
+ * tính nằm ở đó và có test riêng.
+ *
+ * Dùng model KHÔNG-lite: pack vẽ lại toàn bộ khung cảnh nên chất lượng model là
+ * sản phẩm, khác với thay nền (việc nhỏ, bản lite đủ).
+ */
+export async function stylize(o: {
+  image: ImageInput;
+  prompt: string;
+  aspectRatio: string;
+  /** "2K" khi người dùng chọn chất lượng cao — mặc định theo env/model */
+  imageSize?: string;
+}): Promise<RetouchResult> {
+  return generateImage({
+    model: IMAGE_MODEL_HIRES,
+    image: o.image,
+    prompt: o.prompt,
+    aspectRatio: o.aspectRatio,
+    imageSize: o.imageSize ?? IMAGE_SIZE,
+  });
 }

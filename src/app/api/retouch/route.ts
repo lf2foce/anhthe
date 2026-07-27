@@ -1,16 +1,30 @@
 /**
- * Bước 4 — thay nền bằng model sinh ảnh.
+ * Bước 4 — thay nền (và với ảnh chân dung: đổi áo, làm đẹp, sinh lại ở 2K).
  *
  * Model được yêu cầu giữ nguyên khung và vị trí người, nhưng đó là yêu cầu chứ
  * không phải bảo đảm: bản trả về có thể lệch vài phần trăm. Vì crop ở bước xuất
  * dựa hoàn toàn vào landmark, ở đây ĐO LẠI landmark trên chính ảnh vừa sinh —
  * dùng lại landmark của ảnh gốc là cách chắc chắn nhất để cắt trượt đầu.
+ *
+ * Route nhận `docId` chứ không nhận "chế độ": họ giấy tờ suy ra từ registry ở
+ * server, nên client không thể gửi cờ để mở vest cho ảnh visa.
  */
 
 import { analyzePhoto, retouch } from "@/lib/gemini";
-import { bgHex, type BackgroundId } from "@/lib/docs";
+import {
+  bgHex,
+  getDoc,
+  isBackgroundId,
+  sanitizeRetouch,
+  type BackgroundId,
+  type OutfitId,
+} from "@/lib/docs";
 import { decodeDataUrl, toDataUrl } from "@/lib/imageio";
-import { imageSize } from "@/lib/render";
+import {
+  BACKGROUND_TOLERANCE,
+  backgroundDeviation,
+  imageSize,
+} from "@/lib/render";
 import type { FaceLandmarks } from "@/lib/geometry";
 
 export const runtime = "nodejs";
@@ -21,20 +35,52 @@ export interface RetouchResponse {
   landmarks: FaceLandmarks;
   width: number;
   height: number;
+  /** Nền đã ĐÚNG màu chuẩn chưa — đo bằng số học, không tin lời model */
+  backgroundOk: boolean;
+  /** Lệch tối đa trên một kênh (0–255) so với nền chuẩn */
+  backgroundDeviation: number;
+  /** Tuỳ chọn THẬT SỰ được áp dụng sau khi lọc theo họ giấy tờ */
+  applied: { outfit: OutfitId; polish: boolean; hiRes: boolean };
 }
 
 export async function POST(request: Request) {
   let body: {
     photo?: string;
+    docId?: string;
     background?: BackgroundId;
     smooth?: boolean;
     evenLighting?: boolean;
+    outfit?: OutfitId;
+    polish?: boolean;
+    hiRes?: boolean;
   };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "Body phải là JSON." }, { status: 400 });
   }
+
+  const spec = getDoc(body.docId ?? "");
+  if (!spec) {
+    return Response.json(
+      { error: "Thiếu loại giấy tờ — không biết được phép sửa những gì." },
+      { status: 400 }
+    );
+  }
+
+  // Nền phải nằm trong danh mục đóng, và phải là nền spec CHO PHÉP.
+  const background: BackgroundId = isBackgroundId(body.background)
+    ? body.background
+    : spec.backgrounds[0];
+  if (!spec.backgrounds.includes(background)) {
+    return Response.json(
+      { error: `"${spec.vi}" không cho phép nền này.` },
+      { status: 400 }
+    );
+  }
+
+  // Lọc theo họ: ảnh giấy tờ tuỳ thân không mở vest / làm đẹp / upscale sinh ảnh.
+  const applied = sanitizeRetouch(spec, body);
 
   let image;
   try {
@@ -50,9 +96,10 @@ export async function POST(request: Request) {
       image: { data: image.base64, mimeType: image.mimeType },
       width: src.width,
       height: src.height,
-      backgroundHex: bgHex(body.background ?? "white"),
+      backgroundHex: bgHex(background),
       smooth: !!body.smooth,
       evenLighting: !!body.evenLighting,
+      ...applied,
     });
 
     const out = decodeDataUrl(toDataUrl(edited.data, edited.mimeType));
@@ -72,11 +119,22 @@ export async function POST(request: Request) {
       );
     }
 
+    // Model được YÊU CẦU thay nền, nhưng nó có thể trả về ảnh gần như nguyên bản
+    // mà vẫn "thành công". Đo lại nền ở đây, nếu không thì UI báo "đã thay nền"
+    // trong khi nền cũ còn nguyên — và người dùng chỉ biết khi bị trả ở quầy.
+    // Landmark ở đây đã đo trên chính ảnh vừa sinh, nên chinY dùng được trực tiếp.
+    const deviation = await backgroundDeviation(out.buffer, bgHex(background), {
+      chinFraction: analysis.landmarks.chinY,
+    });
+
     const res: RetouchResponse = {
       photo: toDataUrl(edited.data, edited.mimeType),
       landmarks: analysis.landmarks,
       width: size.width,
       height: size.height,
+      backgroundOk: deviation <= BACKGROUND_TOLERANCE,
+      backgroundDeviation: deviation,
+      applied,
     };
     return Response.json(res);
   } catch (e) {

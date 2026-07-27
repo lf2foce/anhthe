@@ -1,27 +1,33 @@
 "use client";
 
 import { useRef } from "react";
-import { DOCS } from "@/lib/docs";
+import type { DocSpec } from "@/lib/docs";
 import type { Copy, Lang } from "@/lib/i18n";
 import { Kicker } from "@/components/ui";
 
 export function Home({
   t,
   lang,
-  picked,
-  onToggle,
+  docs,
+  primary,
+  onPick,
   onShoot,
   onUpload,
+  onCreative,
 }: {
   t: Copy;
   lang: Lang;
-  picked: string[];
-  onToggle: (id: string) => void;
+  /** Chỉ các loại giấy tờ tuỳ thân — luồng sáng tạo là màn RIÊNG, không phải doc */
+  docs: DocSpec[];
+  /** Loại giấy tờ sẽ chụp và canh cho — chọn MỘT */
+  primary: string;
+  onPick: (id: string) => void;
   onShoot: () => void;
   onUpload: (file: File) => void;
+  /** Rẽ sang Studio sáng tạo — luồng thứ hai, tách hẳn */
+  onCreative: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const n = picked.length;
 
   return (
     <div className="screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-8 pt-9 text-n100">
@@ -37,6 +43,33 @@ export function Home({
         </p>
       </div>
 
+      {/* Hai luồng, chọn TRƯỚC mọi thứ khác: ảnh thẻ (compliance, sửa tối thiểu)
+          vs studio sáng tạo (AI vẽ lại tự do). Chúng khác nhau ở chỗ căn bản nên
+          là hai cửa vào, không phải một tuỳ chọn giấu trong luồng. */}
+      {/* KHÔNG overflow-hidden ở đây: mô tả dài xuống dòng thì bị xén mất chữ.
+          Chiều cao để tự nhiên theo nội dung. */}
+      <button
+        onClick={onCreative}
+        className="flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left"
+        style={{
+          background: "linear-gradient(120deg, #43304b, #1f3a3d)",
+          boxShadow: "inset 0 0 0 1.5px var(--color-neutral-700)",
+        }}
+      >
+        <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-a400/90 text-[15px]">
+          ✨
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[13px] font-bold leading-tight">
+            {t.flowCreativeTitle}
+          </span>
+          <span className="truncate text-[10.5px] leading-tight text-n400">
+            {t.flowCreativeSub}
+          </span>
+        </span>
+        <span className="flex-none text-[15px] text-n400">→</span>
+      </button>
+
       <div className="flex items-baseline gap-2.5 pt-0.5">
         <span className="text-[12.5px] font-bold">{t.pickTitle}</span>
         <span className="h-px flex-1 bg-n700" />
@@ -44,35 +77,33 @@ export function Home({
       </div>
 
       <div className="flex flex-col">
-        {DOCS.map((d) => {
-          const on = picked.includes(d.id);
+        {docs.map((d) => {
+          const on = d.id === primary;
           return (
             <button
               key={d.id}
-              onClick={() => onToggle(d.id)}
-              aria-pressed={on}
-              className="flex items-center gap-3 border-b border-n800 py-3 text-left"
+              onClick={() => onPick(d.id)}
+              role="radio"
+              aria-checked={on}
+              className="flex items-center gap-2.5 border-b border-n800 py-2.5 text-left"
             >
               <span
-                className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full text-[13px] font-bold text-white"
+                className="grid h-[18px] w-[18px] flex-none place-items-center rounded-full"
                 style={{
-                  background: on ? "var(--color-accent)" : "transparent",
                   boxShadow: on
-                    ? "none"
+                    ? "inset 0 0 0 5px var(--color-accent)"
                     : "inset 0 0 0 1.5px var(--color-neutral-700)",
                 }}
-              >
-                {on ? "✓" : ""}
-              </span>
-              <span className="flex flex-1 flex-col gap-0.5">
-                <span className="text-[14px] font-bold leading-tight">
+              />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-[13.5px] font-bold leading-tight">
                   {lang === "vi" ? d.vi : d.en}
                 </span>
-                <span className="text-[11px] leading-tight text-n500">
+                <span className="truncate text-[10.5px] leading-tight text-n500">
                   {lang === "vi" ? d.noteVi : d.noteEn}
                 </span>
               </span>
-              <span className="whitespace-nowrap text-[11px] font-semibold text-a300">
+              <span className="flex-none whitespace-nowrap text-[10.5px] font-semibold text-a300">
                 {d.dim}
               </span>
             </button>
@@ -83,7 +114,6 @@ export function Home({
       <div className="mt-auto flex items-center gap-3.5 pt-2.5">
         <button
           onClick={onShoot}
-          disabled={n === 0}
           className="grid h-[86px] w-[86px] flex-none place-items-center rounded-full bg-accent text-[32px] text-white shadow-lg"
           aria-label={t.ctaShoot}
         >
@@ -92,24 +122,20 @@ export function Home({
         <div className="flex flex-1 flex-col gap-2">
           <button
             onClick={onShoot}
-            disabled={n === 0}
             className="rounded-full py-3 text-[13px] font-semibold text-n200 shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
           >
             {t.ctaShoot}
           </button>
           <button
             onClick={() => fileRef.current?.click()}
-            disabled={n === 0}
             className="text-left text-[11.5px] font-semibold text-a300 underline underline-offset-2"
           >
             {t.ctaUpload}
           </button>
-          <span className="pl-0.5 text-[11px] text-n500">
-            {n === 0
-              ? t.pickNone
-              : lang === "vi"
-                ? `${n} loại đã chọn`
-                : `${n} selected`}
+          {/* Nói trước là các cỡ khác thêm sau, để người dùng không đi tìm nút
+              chọn nhiều loại ở màn này. */}
+          <span className="pl-0.5 text-[11px] leading-snug text-n500">
+            {t.moreSizesLater}
           </span>
         </div>
       </div>

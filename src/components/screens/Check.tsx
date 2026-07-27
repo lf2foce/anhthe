@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { passCount, type CheckResult } from "@/lib/checks";
+import { passCount, requiredCount, type Compliance } from "@/lib/checks";
 import { CHECK_LABELS, type Copy, type Lang } from "@/lib/i18n";
 import { getDoc } from "@/lib/docs";
 import {
@@ -28,7 +28,7 @@ export function Check({
   lang: Lang;
   photo: string | null;
   checking: boolean;
-  result: CheckResult | null;
+  result: Compliance | null;
   error: string | null;
   onBack: () => void;
   onRetake: () => void;
@@ -104,14 +104,17 @@ function Result({
 }: {
   t: Copy;
   lang: Lang;
-  result: CheckResult;
+  result: Compliance;
   onRetake: () => void;
   onContinue: () => void;
 }) {
+  // Điểm chỉ tính trên tiêu chí BẮT BUỘC với tập giấy tờ đang chọn — chọn riêng
+  // ảnh chân dung thì "cười nhẹ" không được phép trừ điểm.
+  const total = requiredCount(result.checks);
   const score = passCount(result.checks);
   const verdict =
     result.verdict === "pass"
-      ? { title: t.verdictPass, sub: t.verdictSubPass }
+      ? { title: t.verdictPass, sub: t.verdictSubPass.replace("{n}", String(total)) }
       : result.verdict === "fixable"
         ? { title: t.verdictFixable, sub: t.verdictSubFixable }
         : { title: t.verdictFail, sub: t.verdictSubFail };
@@ -119,7 +122,7 @@ function Result({
   return (
     <>
       <div className="flex items-center gap-4">
-        <ScoreRing value={score} total={result.checks.length} />
+        <ScoreRing value={score} total={total} />
         <div className="flex flex-col gap-1.5">
           <span
             className={`text-[14px] font-bold leading-tight ${
@@ -138,17 +141,30 @@ function Result({
         {result.checks.map((c) => (
           <div
             key={c.id}
-            className="flex items-start gap-3 border-t border-n800 px-0.5 py-2.5"
+            className={`flex items-start gap-3 border-t border-n800 px-0.5 py-2.5 ${
+              c.required ? "" : "opacity-55"
+            }`}
           >
             <span className="pt-0.5">
-              <Dot ok={c.pass} size={20} />
+              {/* Tiêu chí không bắt buộc trượt thì vẫn hiện, nhưng là ghi chú —
+                  không tô đỏ, vì nó không chặn đường xuất file. */}
+              <Dot ok={c.pass || !c.required} size={20} />
             </span>
             <div className="flex flex-col gap-0.5">
               <span className="text-[12.5px] font-semibold leading-tight">
                 {CHECK_LABELS[c.id]?.[lang] ?? c.id}
+                {!c.required ? (
+                  <span className="pl-1.5 font-normal text-n500">
+                    {t.notRequired}
+                  </span>
+                ) : null}
               </span>
               {!c.pass && c.detail ? (
-                <span className="text-[11px] leading-snug text-a300">
+                <span
+                  className={`text-[11px] leading-snug ${
+                    c.required ? "text-a300" : "text-n500"
+                  }`}
+                >
                   {c.detail}
                 </span>
               ) : null}

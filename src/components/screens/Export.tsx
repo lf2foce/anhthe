@@ -1,12 +1,20 @@
 "use client";
 
-import { DOCS, getDoc, pxLabel, type DocSpec } from "@/lib/docs";
-import type { Copy, Lang } from "@/lib/i18n";
+import {
+  bgHex,
+  getDoc,
+  pxLabel,
+  type BackgroundId,
+  type DocSpec,
+} from "@/lib/docs";
+import type { Compliance } from "@/lib/checks";
+import { CHECK_LABELS, type Copy, type Lang } from "@/lib/i18n";
 import type { Working } from "@/lib/studio";
 import { CropPreview } from "@/components/CropPreview";
 import {
   BackBar,
   ErrorNote,
+  GhostButton,
   PrimaryButton,
   Spinner,
   Toggle,
@@ -15,11 +23,18 @@ import {
 export function Export({
   t,
   lang,
-  working,
+  workingFor,
+  backgroundFor,
+  headScaleOf,
+  docs,
+  primary,
   picked,
   onToggle,
+  compliance,
+  pendingCount,
+  retouching,
+  onRetouch,
   brightness,
-  headScale,
   sheet,
   onSheet,
   sheetDocId,
@@ -31,11 +46,23 @@ export function Export({
 }: {
   t: Copy;
   lang: Lang;
-  working: Working;
+  /** Ảnh của đúng nhóm nền cho từng loại — nhiều nền là nhiều ảnh khác nhau */
+  workingFor: (docId: string) => Working;
+  backgroundFor: (spec: DocSpec) => BackgroundId;
+  headScaleOf: (docId: string) => number;
+  /** Chỉ những loại CÙNG HỌ với loại chính — trộn hai chế độ là bất khả */
+  docs: DocSpec[];
+  /** Loại đã chụp và canh cho — không cho bỏ tick */
+  primary: string;
   picked: string[];
   onToggle: (id: string) => void;
+  /** Kết luận cho tập ĐANG chọn — tính lại mỗi lần tick */
+  compliance: Compliance | null;
+  /** Số nhóm nền còn phải thay — tick thêm loại có thể sinh nhóm nền mới */
+  pendingCount: number;
+  retouching: boolean;
+  onRetouch: () => void;
   brightness: number;
-  headScale: number;
   sheet: boolean;
   onSheet: (v: boolean) => void;
   sheetDocId: string | null;
@@ -46,7 +73,19 @@ export function Export({
   onExport: () => void;
 }) {
   const count = picked.length + (sheet ? 1 : 0);
-  const sheetSpec = getDoc(sheetDocId ?? picked[0] ?? "") ?? getDoc("vn34")!;
+  const sheetSpec = getDoc(sheetDocId ?? primary) ?? getDoc(primary)!;
+  const fitOf = (docId: string) =>
+    compliance?.fits.find((f) => f.docId === docId) ?? null;
+
+  /**
+   * Chỉ còn MỘT loại trượt cần nói.
+   *
+   * Trước đây phải tách "trượt vì loại vừa thêm khắt khe hơn" khỏi "trượt từ đầu",
+   * vì tick lẫn LinkedIn với giấy tờ tuỳ thân làm đổi mức khắt khe. Chế độ tách ở
+   * trang chủ khiến chuyện đó thành bất khả — mọi loại ở đây cùng một họ, nên mọi
+   * tiêu chí trượt đều là trượt từ bước kiểm tra.
+   */
+  const failing = compliance?.checks.filter((c) => c.required && !c.pass) ?? [];
 
   return (
     <div className="screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
@@ -56,33 +95,55 @@ export function Export({
       </p>
 
       <div className="flex flex-col">
-        {DOCS.map((d) => {
+        {docs.map((d) => {
           const on = picked.includes(d.id);
+          const isPrimary = d.id === primary;
+          const w = workingFor(d.id);
+          const fit = on ? fitOf(d.id) : null;
           return (
             <button
               key={d.id}
               onClick={() => onToggle(d.id)}
               aria-pressed={on}
+              disabled={isPrimary}
               className="flex items-center gap-3 border-b border-n800 px-0.5 py-2.5 text-left"
             >
               <span className="w-[34px] flex-none overflow-hidden rounded-md shadow-[inset_0_0_0_1px_var(--color-neutral-700)]">
                 <CropPreview
-                  photo={working.photo}
-                  landmarks={working.landmarks}
-                  imgW={working.width}
-                  imgH={working.height}
+                  photo={w.photo}
+                  landmarks={w.landmarks}
+                  imgW={w.width}
+                  imgH={w.height}
                   spec={d}
-                  headScale={headScale}
+                  backgroundHex={bgHex(backgroundFor(d))}
+                  headScale={headScaleOf(d.id)}
                   brightness={brightness}
                 />
               </span>
               <span className="flex flex-1 flex-col gap-0.5">
                 <span className="text-[13px] font-bold">
                   {lang === "vi" ? d.vi : d.en}
+                  {isPrimary ? (
+                    <span className="pl-1.5 text-[10px] font-semibold uppercase tracking-wider text-a300">
+                      {t.primaryTag}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="text-[10.5px] text-n500">{pxLabel(d)}</span>
                 {!d.verified ? (
                   <span className="text-[10px] text-a300">{t.unverified}</span>
+                ) : null}
+                {/* Loại nào KHÔNG lấy được từ tấm ảnh này thì nói ngay ở dòng của
+                    nó, đừng để người dùng xuất ra rồi mới đọc cảnh báo. */}
+                {fit?.errors.length ? (
+                  <span className="text-[10px] leading-snug text-a300">
+                    {fit.errors[0]}
+                  </span>
+                ) : null}
+                {fit && !fit.resolutionOk ? (
+                  <span className="text-[10px] leading-snug text-a300">
+                    {t.lowRes}
+                  </span>
                 ) : null}
               </span>
               <span
@@ -101,6 +162,29 @@ export function Export({
           );
         })}
       </div>
+
+      {failing.length ? (
+        <ErrorNote>
+          <strong className="block pb-1">{t.stillFailing}</strong>
+          {failing.map((c) => CHECK_LABELS[c.id]?.[lang] ?? c.id).join(", ")}
+        </ErrorNote>
+      ) : null}
+
+      {/* Loại mới tick có thể đòi màu nền khác — cần thêm một lần thay nền nữa. */}
+      {pendingCount > 0 ? (
+        <div className="flex flex-col gap-2 rounded-2xl bg-n800/70 px-3.5 py-3">
+          <span className="text-[11.5px] leading-snug text-n300">
+            {t.needMoreBg}
+          </span>
+          {retouching ? (
+            <Spinner label={t.applying} />
+          ) : (
+            <GhostButton onClick={onRetouch}>
+              {pendingCount > 1 ? `${t.applyBg} (${pendingCount}×)` : t.applyBg}
+            </GhostButton>
+          )}
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3 rounded-3xl bg-bg p-4 text-ink">
         <Toggle
@@ -132,9 +216,10 @@ export function Export({
               })}
             </div>
             <SheetPreview
-              working={working}
+              working={workingFor(sheetSpec.id)}
               spec={sheetSpec}
-              headScale={headScale}
+              backgroundHex={bgHex(backgroundFor(sheetSpec))}
+              headScale={headScaleOf(sheetSpec.id)}
               brightness={brightness}
             />
           </>
@@ -165,11 +250,13 @@ export function Export({
 function SheetPreview({
   working,
   spec,
+  backgroundHex,
   headScale,
   brightness,
 }: {
   working: Working;
   spec: DocSpec;
+  backgroundHex: string;
   headScale: number;
   brightness: number;
 }) {
@@ -217,6 +304,7 @@ function SheetPreview({
               imgW={working.width}
               imgH={working.height}
               spec={spec}
+              backgroundHex={backgroundHex}
               headScale={headScale}
               brightness={brightness}
               className="h-full w-full"

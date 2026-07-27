@@ -9,7 +9,7 @@
  * (xem brightnessMultiplier ở lib/render.ts).
  */
 
-import { computeCrop, type FaceLandmarks } from "@/lib/geometry";
+import { computeCrop, extendToFit, type FaceLandmarks } from "@/lib/geometry";
 import type { DocSpec } from "@/lib/docs";
 
 export function CropPreview({
@@ -18,6 +18,7 @@ export function CropPreview({
   imgW,
   imgH,
   spec,
+  backgroundHex,
   headScale = 1,
   brightness = 0,
   guides = false,
@@ -29,13 +30,27 @@ export function CropPreview({
   imgW: number;
   imgH: number;
   spec: DocSpec;
+  /** Nền đã resolve cho spec này — phải khớp cái /api/export dùng */
+  backgroundHex: string;
   headScale?: number;
   brightness?: number;
   guides?: boolean;
   crownLabel?: string;
   className?: string;
 }) {
-  const { crop } = computeCrop(landmarks, imgW, imgH, spec, headScale);
+  // Nới khung ảo giống evaluate/export: khung có thể thò ra ngoài ảnh gốc, và
+  // phần thò ra hiện đúng màu nền container — chính là phần sẽ được sharp.extend
+  // lấp lúc xuất. Nhờ vậy preview và file thật là một.
+  const plan = extendToFit(landmarks, imgW, imgH, [spec], {
+    [spec.id]: headScale,
+  });
+  const padded = computeCrop(plan.landmarks, plan.width, plan.height, spec, headScale);
+  const crop = {
+    left: padded.crop.left - plan.pad.left,
+    top: padded.crop.top - plan.pad.top,
+    width: padded.crop.width,
+    height: padded.crop.height,
+  };
 
   const pct = (v: number) => `${v * 100}%`;
   const crownTop = (landmarks.crownY * imgH - crop.top) / crop.height;
@@ -46,7 +61,7 @@ export function CropPreview({
       className={`relative overflow-hidden ${className}`}
       style={{
         aspectRatio: `${spec.widthMm} / ${spec.heightMm}`,
-        background: spec.background,
+        background: backgroundHex,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

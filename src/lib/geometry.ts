@@ -36,6 +36,8 @@ export interface CropResult {
   headRatio: number;
   /** Đường mắt từ mép dưới sau crop */
   eyeFromBottom: number;
+  /** Chiều cao đầu tính bằng pixel ảnh nguồn — KHÔNG đổi khi nới khung */
+  headPx: number;
   /** Lý do ảnh KHÔNG dùng được cho spec này (crop tràn khỏi ảnh gốc…) */
   errors: string[];
 }
@@ -64,6 +66,7 @@ export function computeCrop(
       crop: { left: 0, top: 0, width: imgW, height: imgH },
       headRatio: 0,
       eyeFromBottom: 0,
+      headPx: 0,
       errors: ["Không đo được chiều cao đầu (landmark không hợp lệ)."],
     };
   }
@@ -125,8 +128,112 @@ export function computeCrop(
     );
   }
 
-  return { crop, headRatio: achievedHead, eyeFromBottom: achievedEye, errors };
+  return {
+    crop,
+    headRatio: achievedHead,
+    eyeFromBottom: achievedEye,
+    headPx,
+    errors,
+  };
 }
+
+// ── Nới khung: thêm khoảng trống quanh đầu bằng SỐ HỌC ────────────────────────
+
+export interface CanvasPad {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
+export interface ExtendPlan {
+  pad: CanvasPad;
+  /** Kích thước ảnh sau khi nới */
+  width: number;
+  height: number;
+  /** Landmark quy về hệ toạ độ ảnh MỚI — suy ra bằng phép dịch, không đo lại */
+  landmarks: FaceLandmarks;
+  /** Có phải nới thật không, hay ảnh đã đủ rộng */
+  needed: boolean;
+}
+
+export const NO_PAD: CanvasPad = { top: 0, left: 0, right: 0, bottom: 0 };
+
+/**
+ * Tính khoảng trống cần THÊM quanh ảnh để mọi spec đã chọn crop được đúng chuẩn.
+ *
+ * Đây là cách đúng để sửa lỗi "ảnh gốc quá sát khuôn mặt" / "đường mắt ngoài chuẩn":
+ * KHÔNG nhờ model dịch người trong khung — làm vậy là bắt nó vẽ lại chủ thể, đúng thứ
+ * prompt retouch đang cấm, và là rủi ro biến dạng nhận dạng. Thay vào đó nới CANVAS
+ * và lấp bằng đúng màu nền chuẩn: chỉ thêm nền, không thêm một nét nào lên người.
+ *
+ * Thuần số học nên landmark mới suy ra được chính xác bằng phép dịch — không cần gọi
+ * model đo lại như bước thay nền.
+ *
+ * Chỉ dùng được khi nền ĐÃ phẳng và đúng màu; nếu không thì chỗ nới sẽ thấy đường
+ * ghép. Người gọi phải tự kiểm điều đó (xem `backgroundDeviation`).
+ */
+export function extendToFit(
+  lm: FaceLandmarks,
+  imgW: number,
+  imgH: number,
+  specs: DocSpec[],
+  headScales: Record<string, number> = {}
+): ExtendPlan {
+  const headPx = (lm.chinY - lm.crownY) * imgH;
+  const eyePx = lm.eyeMidY * imgH;
+  const centerPx = lm.faceCenterX * imgW;
+
+  const pad: CanvasPad = { ...NO_PAD };
+
+  if (headPx > 0) {
+    for (const spec of specs) {
+      const wantRatio = clamp(
+        spec.headRatio.target * (headScales[spec.id] ?? 1),
+        spec.headRatio.min,
+        spec.headRatio.max
+      );
+      const cropH = headPx / wantRatio;
+      const cropW = cropH * (spec.widthMm / spec.heightMm);
+
+      // Khung MONG MUỐN, chưa bị kẹp vào ảnh — phần tràn ra ngoài chính là phần thiếu.
+      const wantTop = eyePx - (1 - spec.eyeFromBottom.target) * cropH;
+      const wantLeft = centerPx - cropW / 2;
+
+      pad.top = Math.max(pad.top, Math.ceil(-wantTop));
+      pad.left = Math.max(pad.left, Math.ceil(-wantLeft));
+      pad.right = Math.max(pad.right, Math.ceil(wantLeft + cropW - imgW));
+      pad.bottom = Math.max(pad.bottom, Math.ceil(wantTop + cropH - imgH));
+    }
+  }
+
+  pad.top = Math.max(0, pad.top);
+  pad.left = Math.max(0, pad.left);
+  pad.right = Math.max(0, pad.right);
+  pad.bottom = Math.max(0, pad.bottom);
+
+  const width = imgW + pad.left + pad.right;
+  const height = imgH + pad.top + pad.bottom;
+  const needed = width !== imgW || height !== imgH;
+
+  return {
+    pad,
+    width,
+    height,
+    // Không nới thì trả landmark NGUYÊN BẢN — công thức quy đổi với pad 0 chỉ là
+    // nhân-chia lại chính nó, và sai số float làm "không đổi gì" khác "đổi 0 đơn vị".
+    landmarks: needed
+      ? {
+          crownY: (lm.crownY * imgH + pad.top) / height,
+          chinY: (lm.chinY * imgH + pad.top) / height,
+          eyeMidY: (lm.eyeMidY * imgH + pad.top) / height,
+          faceCenterX: (lm.faceCenterX * imgW + pad.left) / width,
+        }
+      : lm,
+    needed,
+  };
+}
+
 
 /**
  * Độ phân giải sau crop có đủ cho spec không — kiểm tra TRƯỚC khi phóng to,
@@ -134,7 +241,6 @@ export function computeCrop(
  */
 export function resolutionCheck(
   crop: CropBox,
-  spec: DocSpec,
   target: { width: number; height: number }
 ): { ok: boolean; scale: number } {
   const scale = Math.min(crop.width / target.width, crop.height / target.height);

@@ -88,10 +88,10 @@ export function Capture({
   }
 
   return (
-    <div className="screen-in flex h-full flex-col gap-3.5 bg-bg px-4 pb-6 pt-8 text-ink">
-      <BackBar onBack={onBack} title={t.capTitle} dark={false} />
+    <div className="screen-in flex h-full flex-col gap-3.5 bg-n900 px-4 pb-6 pt-8 text-n100">
+      <BackBar onBack={onBack} title={t.capTitle} />
 
-      <div className="relative flex-1 overflow-hidden rounded-[28px] bg-n300 shadow-lg">
+      <div className="relative flex-1 overflow-hidden rounded-[28px] bg-n800 ring-1 ring-n700">
         {shot ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={shot} alt="" className="h-full w-full object-cover" />
@@ -107,7 +107,7 @@ export function Capture({
         )}
 
         {cam === "denied" && !shot ? (
-          <div className="absolute inset-0 grid place-items-center px-6 text-center text-[12.5px] text-n700">
+          <div className="absolute inset-0 grid place-items-center px-6 text-center text-[12.5px] text-n400">
             {t.camDenied}
           </div>
         ) : null}
@@ -134,19 +134,19 @@ export function Capture({
       {shot ? (
         <div className="flex flex-col gap-2">
           <PrimaryButton onClick={() => onPhoto(shot)}>{t.useThis}</PrimaryButton>
-          <GhostButton onClick={() => setShot(null)} dark={false}>
+          <GhostButton onClick={() => setShot(null)}>
             {t.retakeShort}
           </GhostButton>
         </div>
       ) : (
         <>
           <div className="flex items-center gap-3">
-            <span className="flex-1 text-[11.5px] font-bold text-g700">
+            <span className="flex-1 text-[11.5px] font-bold text-n400">
               {cam === "starting" ? t.camStarting : ""}
             </span>
             <button
               onClick={() => fileRef.current?.click()}
-              className="text-[11.5px] font-semibold text-a700 underline underline-offset-2"
+              className="text-[11.5px] font-semibold text-a300 underline underline-offset-2"
             >
               {t.useUpload}
             </button>
@@ -155,9 +155,9 @@ export function Capture({
             onClick={shoot}
             disabled={cam !== "live"}
             aria-label={t.shutterHint}
-            className="grid h-[78px] w-[78px] flex-none place-self-center place-items-center rounded-full bg-n900 shadow-lg"
+            className="grid h-[78px] w-[78px] flex-none place-self-center place-items-center rounded-full shadow-[inset_0_0_0_3px_var(--color-neutral-100)]"
           >
-            <span className="h-[62px] w-[62px] rounded-full border-[3px] border-bg bg-accent" />
+            <span className="h-[60px] w-[60px] rounded-full bg-accent" />
           </button>
         </>
       )}
