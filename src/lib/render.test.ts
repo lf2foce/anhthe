@@ -83,6 +83,11 @@ describe("renderSheet", () => {
     const meta = await sharp(sheet.buffer).metadata();
     expect([meta.width, meta.height]).toEqual([sheet.width, sheet.height]);
     expect(meta.density).toBe(300);
+
+    const stats = await sharp(sheet.buffer).stats();
+    expect(Math.min(...stats.channels.map((channel) => channel.min))).toBeLessThan(
+      200
+    );
   });
 
   it("xếp được nhiều ảnh 3×4 trên một tờ mà không tràn lề", async () => {
