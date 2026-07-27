@@ -61,8 +61,8 @@ export function Edit({
   );
 
   return (
-    <div className="screen-in flex h-full flex-col bg-n900">
-      <div className="relative h-[300px] flex-none overflow-hidden bg-n800">
+    <div className="screen-in isolate flex h-full min-h-0 flex-col overflow-hidden bg-n900">
+      <div className="relative z-10 h-[300px] flex-none overflow-hidden bg-n800">
         <div className="mx-auto h-full">
           <CropPreview
             photo={working.photo}
@@ -89,8 +89,8 @@ export function Edit({
         </span>
       </div>
 
-      <div className="scr -mt-6 flex flex-1 flex-col gap-4 overflow-auto rounded-t-[30px] bg-bg px-5 pb-6 pt-5 text-ink">
-        <span className="mx-auto -mt-2 h-1 w-11 rounded-full bg-n400" />
+      <div className="scr relative z-0 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-t-[30px] bg-bg px-5 pb-6 pt-5 text-ink">
+        <span className="mx-auto h-1 w-11 flex-none rounded-full bg-n400" />
 
         {picked.length > 1 ? (
           <div className="flex flex-wrap gap-1.5">
