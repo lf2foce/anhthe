@@ -16,7 +16,8 @@ import {
   getPack,
   isAspectChoice,
 } from "@/lib/packs";
-import { decodeDataUrl, toDataUrl } from "@/lib/imageio";
+import { decodeDataUrl } from "@/lib/imageio";
+import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 import {
@@ -45,7 +46,9 @@ const MAX_VARIANTS_HI = 2;
 
 export interface GenerateResponse {
   packId: string;
-  images: string[];
+  /** Id phiên — client gửi lại ở lượt sau để ảnh cùng một phiên nằm chung thư mục */
+  sessionId: string;
+  images: StoredImage[];
 }
 
 export async function POST(request: Request) {
@@ -56,6 +59,7 @@ export async function POST(request: Request) {
   let body: {
     photo?: string;
     packId?: string;
+    sessionId?: string;
     count?: number;
     /** Ghi chú tự do của người dùng — cắt ở MAX_NOTE_LENGTH, chèn trước sàn danh tính */
     note?: string;
@@ -101,6 +105,11 @@ export async function POST(request: Request) {
   const gate = await checkGate(request, count);
   if (isGateFailure(gate)) return gate.response;
 
+  const sessionId =
+    typeof body.sessionId === "string" && /^[a-f0-9]{16}$/.test(body.sessionId)
+      ? body.sessionId
+      : newSessionId();
+
   try {
     const results = await Promise.allSettled(
       Array.from({ length: count }, (_, i) =>
@@ -113,9 +122,21 @@ export async function POST(request: Request) {
       )
     );
 
-    const images = results
-      .filter((r) => r.status === "fulfilled")
-      .map((r) => toDataUrl(r.value.data, r.value.mimeType));
+    const ok = results.filter((r) => r.status === "fulfilled");
+
+    // Cất ảnh ra object storage rồi trả URL. Trả base64 thì vừa đụng trần
+    // response của nền tảng, vừa bốc hơi khi khách F5.
+    const stamp = Date.now();
+    const images: StoredImage[] = await Promise.all(
+      ok.map((r, i) =>
+        storeImage({
+          clientId: gate.clientId,
+          sessionId,
+          name: `${pack.id}-${stamp}-${i}`,
+          buffer: Buffer.from(r.value.data, "base64"),
+        })
+      )
+    );
 
     if (images.length === 0) {
       const first = results.find((r) => r.status === "rejected");
@@ -124,7 +145,7 @@ export async function POST(request: Request) {
         : new Error("Không sinh được ảnh nào.");
     }
 
-    const res: GenerateResponse = { packId: pack.id, images };
+    const res: GenerateResponse = { packId: pack.id, sessionId, images };
     return withClientCookie(NextResponse.json(res), request, gate.clientId);
   } catch (e) {
     console.error("[api/generate]", e);

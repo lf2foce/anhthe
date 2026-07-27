@@ -4,6 +4,7 @@ import type { PhotoCheck } from "./checks";
 import type { BackgroundId } from "./docs";
 import type { Working } from "./studio";
 import type { ExportedFile, ExportGroup } from "@/app/api/export/route";
+import type { StoredImage } from "./storage";
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -63,12 +64,13 @@ export function exportFiles(opts: {
 export function generateImages(opts: {
   photo: string;
   packId: string;
+  sessionId: string | null;
   count: number;
   note: string;
   aspectRatio: string;
   quality: "std" | "high";
-}): Promise<{ packId: string; images: string[] }> {
-  return post<{ packId: string; images: string[] }>("/api/generate", opts);
+}): Promise<{ packId: string; sessionId: string; images: StoredImage[] }> {
+  return post("/api/generate", opts);
 }
 
 /** Vòng lặp trên một ảnh đã sinh: chỉnh theo ghi chú, hoặc vẽ lại ở 2K */
@@ -76,8 +78,9 @@ export function refineImage(opts: {
   photo: string;
   note: string;
   upscale: boolean;
-}): Promise<{ image: string }> {
-  return post<{ image: string }>("/api/refine", opts);
+  sessionId: string | null;
+}): Promise<{ image: StoredImage; sessionId: string }> {
+  return post("/api/refine", opts);
 }
 
 /** Số lượt còn lại hôm nay — không gọi model nên gọi thoải mái */

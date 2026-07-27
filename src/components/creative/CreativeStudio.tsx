@@ -14,7 +14,8 @@
 
 import { useRef, useState } from "react";
 import { generateImages, refineImage } from "@/lib/api";
-import { downloadDataUrl, extensionOf } from "@/lib/capture";
+import { downloadUrl, fetchBlob } from "@/lib/capture";
+import type { StoredImage } from "@/lib/storage";
 import {
   ASPECT_CHOICES,
   MAX_NOTE_LENGTH,
@@ -37,7 +38,8 @@ type Step = "packs" | "capture" | "results";
 
 /** Một ảnh kết quả + trạng thái vòng chỉnh của riêng nó */
 interface Shot {
-  src: string;
+  /** Ảnh trên object storage: url xem được, key để mở khoá sau khi trả tiền */
+  img: StoredImage;
   busy: boolean;
 }
 
@@ -62,6 +64,8 @@ export function CreativeStudio({
   const [showOpts, setShowOpts] = useState(false);
 
   const [shots, setShots] = useState<Shot[]>([]);
+  /** Ảnh cùng một phiên nằm chung thư mục trên storage — dọn theo TTL cho gọn */
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [sel, setSel] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [zipping, setZipping] = useState(false);
@@ -87,9 +91,10 @@ export function CreativeStudio({
     setError(null);
     if (!append) setShots([]);
     try {
-      const { images } = await generateImages({
+      const out = await generateImages({
         photo: src,
         packId: target.id,
+        sessionId,
         count,
         note,
         aspectRatio: aspect,
@@ -97,7 +102,8 @@ export function CreativeStudio({
       });
       // Lô đã bị thay khi lượt này đang bay → kết quả thuộc về quá khứ, bỏ.
       if (batchRef.current !== myBatch) return;
-      const fresh = images.map((s) => ({ src: s, busy: false }));
+      setSessionId(out.sessionId);
+      const fresh = out.images.map((img) => ({ img, busy: false }));
       setShots((prev) => {
         const next = append ? [...prev, ...fresh] : fresh;
         // Nhảy tới ảnh mới đầu tiên — người dùng vừa bấm tạo thì muốn xem cái mới.
@@ -123,10 +129,15 @@ export function CreativeStudio({
       prev.map((s, i) => (i === index ? { ...s, busy: true } : s))
     );
     try {
-      const { image } = await refineImage({ photo: target.src, ...opts });
+      const out = await refineImage({
+        photo: target.img.url,
+        sessionId,
+        ...opts,
+      });
       if (batchRef.current !== myBatch) return; // ảnh gốc không còn trong lô
+      setSessionId(out.sessionId);
       setShots((prev) =>
-        prev.map((s, i) => (i === index ? { src: image, busy: false } : s))
+        prev.map((s, i) => (i === index ? { img: out.image, busy: false } : s))
       );
     } catch (e) {
       if (batchRef.current !== myBatch) return;
@@ -151,17 +162,15 @@ export function CreativeStudio({
       // jszip nạp động — chỉ cần khi bấm tải, không nên nằm trong bundle chung.
       const { default: JSZip } = await import("jszip");
       const zip = new JSZip();
-      shots.forEach((shot, i) => {
-        zip.file(
-          `${pack?.id ?? "anh"}-${i + 1}.${extensionOf(shot.src)}`,
-          shot.src.split(",")[1],
-          {
-          base64: true,
-        });
-      });
+      // Tải hết về TRƯỚC rồi mới gói: đưa Promise thẳng cho jszip thì lỗi mạng
+      // giữa chừng cho ra file zip thiếu ảnh mà không ai biết.
+      const blobs = await Promise.all(shots.map((s) => fetchBlob(s.img.url)));
+      blobs.forEach((b, i) =>
+        zip.file(`${pack?.id ?? "anh"}-${i + 1}.jpg`, b)
+      );
       const blob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(blob);
-      downloadDataUrl(url, `studio-${pack?.id ?? "anh"}.zip`);
+      downloadUrl(url, `studio-${pack?.id ?? "anh"}.zip`);
       URL.revokeObjectURL(url);
     } catch (e) {
       setError((e as Error).message);
@@ -213,7 +222,7 @@ export function CreativeStudio({
           {selected ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={selected.src}
+              src={selected.img.url}
               alt=""
               className="h-full w-full object-contain"
             />
@@ -231,10 +240,7 @@ export function CreativeStudio({
             <div className="absolute bottom-2.5 right-2.5 flex gap-1.5">
               <button
                 onClick={() =>
-                  downloadDataUrl(
-                    selected.src,
-                    `${pack.id}-${sel + 1}.${extensionOf(selected.src)}`
-                  )
+                  downloadUrl(selected.img.url, `${pack.id}-${sel + 1}.jpg`)
                 }
                 className="rounded-full bg-n900/80 px-3 py-1.5 text-[11px] font-bold text-n100 backdrop-blur"
               >
@@ -268,7 +274,7 @@ export function CreativeStudio({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={shot.src}
+                  src={shot.img.url}
                   alt=""
                   className="h-full w-full object-cover"
                 />

@@ -11,7 +11,8 @@
 
 import { nearestAspectRatio, stylize } from "@/lib/gemini";
 import { MAX_NOTE_LENGTH, buildRefinePrompt } from "@/lib/packs";
-import { decodeDataUrl, toDataUrl } from "@/lib/imageio";
+import { decodeDataUrl } from "@/lib/imageio";
+import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
 import { imageSize } from "@/lib/render";
 import { NextResponse } from "next/server";
 
@@ -30,7 +31,12 @@ export async function POST(request: Request) {
   const tooBig = checkSize(request);
   if (tooBig) return tooBig.response;
 
-  let body: { photo?: string; note?: string; upscale?: boolean };
+  let body: {
+    photo?: string;
+    note?: string;
+    upscale?: boolean;
+    sessionId?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -66,8 +72,18 @@ export async function POST(request: Request) {
       aspectRatio: nearestAspectRatio(size.width, size.height),
       imageSize: upscale ? "2K" : undefined,
     });
+    const sessionId =
+      typeof body.sessionId === "string" && /^[a-f0-9]{16}$/.test(body.sessionId)
+        ? body.sessionId
+        : newSessionId();
+    const stored: StoredImage = await storeImage({
+      clientId: gate.clientId,
+      sessionId,
+      name: `sua-${Date.now()}`,
+      buffer: Buffer.from(out.data, "base64"),
+    });
     return withClientCookie(
-      NextResponse.json({ image: toDataUrl(out.data, out.mimeType) }),
+      NextResponse.json({ image: stored, sessionId }),
       request,
       gate.clientId
     );

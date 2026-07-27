@@ -33,6 +33,34 @@ Dùng Postgres (Neon) qua `PHOTO_DATABASE_URL`, chạy `migrations/001_photo_quo
 **Không cần Redis** — một bảng đếm với UPSERT đã atomic sẵn. Bỏ trống biến này thì
 rơi về RAM: đủ cho `npm run dev` và test, không đủ cho production.
 
+## Kho ảnh và ranh giới trả tiền
+
+Ảnh đi lên Cloudflare R2 (`src/lib/storage.ts`) chứ không nhét base64 vào JSON.
+Một thay đổi gỡ BỐN thứ: F5 không mất ảnh, hết đụng trần response, client không
+còn ôm data URL full-res để vẽ ở thumbnail 46px, và có nền móng cho tài khoản.
+
+Không cần tài khoản: khoá thư mục là cookie ẩn danh `aid` đã có từ gate
+(`{aid}/{phiên}/{tên}.jpg`). Gắn Clerk sau thì chuyển object theo `aid` sang user.
+
+Mỗi ảnh lưu **hai bản**: bản sạch và bản đóng dấu. Lưu cả hai lúc upload chứ
+không đóng dấu lúc phục vụ — đóng dấu mỗi lần xem là tốn CPU mỗi request, và bản
+sạch PHẢI có sẵn khi khách trả tiền, vì sinh lại là thêm một lần gọi model, tức
+bán một tấm ảnh mà tốn tiền hai lần.
+
+Watermark (`src/lib/watermark.ts`) lát kín theo đường chéo và **co theo cỡ ảnh**.
+Bản đầu để dấu thưa (11×cỡ chữ) và test tìm ra cả vùng 100×100 sạch trơn — cắt
+phát là mất dấu. Test canh tính chất đúng: không cắt ra được **một phần tư ảnh**
+nào sạch dấu. Nhớ: watermark là công cụ CHUYỂN ĐỔI, không kiểm soát chi phí —
+tiền model đã tiêu trước khi có tấm ảnh nào để đóng dấu; chốt chi phí là `gate.ts`.
+
+Thu tiền (`src/lib/orders.ts`): VietQR + mã memo, đối soát tay bằng `markPaid`.
+Không cổng thanh toán, không webhook — đừng xây quầy thu ngân cho cửa hàng chưa
+có khách. `/api/unlock` cấp link bản sạch, và kiểm HAI thứ: khoá có thuộc về
+khách này không (`ownsKey` — đây là ảnh khuôn mặt, khoá khó đoán không phải
+quyền), và phiên đã trả tiền chưa.
+
+**Bucket phải để RIÊNG TƯ.** Link là presigned, hạn một giờ.
+
 ## Deploy
 
 Đã đo thật (không phải suy từ config):

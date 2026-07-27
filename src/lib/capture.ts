@@ -92,3 +92,26 @@ export function extensionOf(dataUrl: string): string {
   const sub = (m?.[1] ?? "jpeg").toLowerCase();
   return sub === "jpeg" ? "jpg" : sub;
 }
+
+/**
+ * Tải một ảnh về máy, dùng được cho CẢ data URL lẫn URL thường.
+ *
+ * Ảnh giờ nằm trên object storage nên phần lớn là URL ký có hạn; giữ nhánh data
+ * URL vì khi chưa cấu hình storage thì app vẫn chạy bằng data URL.
+ */
+export function downloadUrl(url: string, name: string): void {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/** Lấy nội dung ảnh về dạng Blob — để gói zip từ URL */
+export async function fetchBlob(url: string): Promise<Blob> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Không tải được ảnh.");
+  return res.blob();
+}
