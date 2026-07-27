@@ -194,7 +194,7 @@ function SheetPreview({
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-xl bg-white shadow-[inset_0_0_0_1px_var(--color-neutral-300)]"
+      className="relative w-full overflow-hidden rounded-[2px] bg-white shadow-[inset_0_0_0_1px_var(--color-neutral-400)]"
       style={{ aspectRatio: `${SHEET_W} / ${SHEET_H}` }}
     >
       {Array.from({ length: cols * rows }, (_, i) => {
@@ -219,7 +219,7 @@ function SheetPreview({
               spec={spec}
               headScale={headScale}
               brightness={brightness}
-              className="h-full w-full rounded-[2px] shadow-[0_0_0_1px_rgba(32,30,29,.12)]"
+              className="h-full w-full"
             />
             <PreviewCropMarks />
           </div>
@@ -231,19 +231,21 @@ function SheetPreview({
 
 /** Dấu góc xem trước — nằm ngoài ảnh, cùng nguyên tắc với bản JPG 300dpi. */
 function PreviewCropMarks() {
-  const horizontal = "absolute h-px w-[5px] bg-n500/70";
-  const vertical = "absolute h-[5px] w-px bg-n500/70";
+  // Preview chỉ rộng khoảng 300px nên nét cần đậm hơn bản in 300dpi một chút
+  // để người dùng vẫn nhận ra dấu cắt sau khi thu nhỏ.
+  const horizontal = "absolute z-20 h-px w-[6px] bg-n700/80";
+  const vertical = "absolute z-20 h-[6px] w-px bg-n700/80";
 
   return (
-    <span className="pointer-events-none absolute inset-0">
-      <span className={`${horizontal} -left-2 top-0`} />
-      <span className={`${vertical} -top-2 left-0`} />
-      <span className={`${horizontal} -right-2 top-0`} />
-      <span className={`${vertical} -top-2 right-0`} />
-      <span className={`${horizontal} -left-2 bottom-0`} />
-      <span className={`${vertical} -bottom-2 left-0`} />
-      <span className={`${horizontal} -right-2 bottom-0`} />
-      <span className={`${vertical} -bottom-2 right-0`} />
+    <span className="pointer-events-none absolute inset-0 z-20">
+      <span className={`${horizontal} -left-[7px] top-0`} />
+      <span className={`${vertical} -top-[7px] left-0`} />
+      <span className={`${horizontal} -right-[7px] top-0`} />
+      <span className={`${vertical} -top-[7px] right-0`} />
+      <span className={`${horizontal} -left-[7px] bottom-0`} />
+      <span className={`${vertical} -bottom-[7px] left-0`} />
+      <span className={`${horizontal} -right-[7px] bottom-0`} />
+      <span className={`${vertical} -bottom-[7px] right-0`} />
     </span>
   );
 }
