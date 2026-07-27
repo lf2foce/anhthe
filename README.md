@@ -67,7 +67,14 @@ có khách. `/api/unlock` cấp link bản sạch, và kiểm HAI thứ: khoá c
 khách này không (`ownsKey` — đây là ảnh khuôn mặt, khoá khó đoán không phải
 quyền), và phiên đã trả tiền chưa.
 
-**Bucket phải để RIÊNG TƯ.** Link là presigned, hạn một giờ.
+**Bucket phải để RIÊNG TƯ.** Link là presigned, hạn một giờ — khác `phenau_v3`
+(`storage_service.py`) vốn để bucket CÔNG KHAI kèm `r2_public_base_url`. Bên đó
+đúng vì ảnh chat/avatar không có tường phí; ở đây có, nên public là hỏng.
+
+Kèm theo: khoá bản xem thử là uuid ngẫu nhiên, KHÔNG suy ra được từ khoá bản
+sạch. Đặt `x-xem.jpg` cạnh `x.jpg` thì bỏ hậu tố là có ảnh sạch miễn phí — hiện
+presigned chặn được, nhưng một ngày ai đó bật public bucket theo thói quen từ dự
+án khác là tường phí bay ngay.
 
 ## Deploy
 

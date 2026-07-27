@@ -63,6 +63,12 @@ function keyFor(clientId: string, sessionId: string, name: string): string {
   return `${clientId}/${sessionId}/${name}`;
 }
 
+/**
+ * Cache-Control cho link presigned. Hạn link 1 giờ nên cache dài hơn là vô nghĩa,
+ * còn không đặt gì thì mỗi lần cuộn qua thumbnail lại là một lượt egress.
+ */
+const CACHE_CONTROL = "private, max-age=3600";
+
 async function put(key: string, body: Buffer): Promise<void> {
   await client!.send(
     new PutObjectCommand({
@@ -70,6 +76,7 @@ async function put(key: string, body: Buffer): Promise<void> {
       Key: key,
       Body: body,
       ContentType: "image/jpeg",
+      CacheControl: CACHE_CONTROL,
     })
   );
 }
@@ -110,7 +117,15 @@ export async function storeImage(opts: {
     };
   }
 
-  const markKey = keyFor(opts.clientId, opts.sessionId, `${opts.name}-xem.jpg`);
+  // Khoá bản xem thử KHÔNG được suy ra từ khoá bản sạch (và ngược lại). Đặt
+  // `x-xem.jpg` cạnh `x.jpg` thì chỉ cần bỏ hậu tố là có ảnh sạch miễn phí —
+  // hiện không khai thác được vì bucket riêng tư + presigned, nhưng một ngày ai
+  // đó bật public bucket theo thói quen từ dự án khác là tường phí bay ngay.
+  const markKey = keyFor(
+    opts.clientId,
+    opts.sessionId,
+    `${crypto.randomUUID().replace(/-/g, "")}.jpg`
+  );
   const mark = await watermarked(opts.buffer);
   await Promise.all([put(cleanKey, opts.buffer), put(markKey, mark)]);
 
