@@ -14,7 +14,7 @@
 
 import { useRef, useState } from "react";
 import { generateImages, refineImage } from "@/lib/api";
-import { downloadDataUrl } from "@/lib/capture";
+import { downloadDataUrl, extensionOf } from "@/lib/capture";
 import {
   ASPECT_CHOICES,
   MAX_NOTE_LENGTH,
@@ -152,7 +152,10 @@ export function CreativeStudio({
       const { default: JSZip } = await import("jszip");
       const zip = new JSZip();
       shots.forEach((shot, i) => {
-        zip.file(`${pack?.id ?? "anh"}-${i + 1}.jpg`, shot.src.split(",")[1], {
+        zip.file(
+          `${pack?.id ?? "anh"}-${i + 1}.${extensionOf(shot.src)}`,
+          shot.src.split(",")[1],
+          {
           base64: true,
         });
       });
@@ -193,14 +196,20 @@ export function CreativeStudio({
       }`;
 
     return (
-      <div className="screen-in scr flex h-full flex-col gap-3 overflow-auto bg-n900 px-5 pb-6 pt-9 text-n100">
+      <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-3 overflow-auto bg-n900 px-5 pb-6 pt-9 text-n100">
         <BackBar
           onBack={() => setStep("packs")}
           title={lang === "vi" ? pack.vi : pack.en}
         />
 
+        {/* Màn rộng: ẢNH bên trái, chỗ dặn AI và tuỳ chọn bên phải. Xếp dọc trên
+            màn rộng thì ảnh bị nhét vào một cột hẹp còn điều khiển kéo ngang cả
+            nghìn pixel — vừa xấu vừa phải đảo mắt lên xuống mỗi lần chỉnh. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
+        <div className="flex min-w-0 flex-col gap-3">
+
         {/* Ảnh đang chọn — to, object-contain để mọi khung đều trọn vẹn */}
-        <div className="relative grid h-[340px] flex-none place-items-center overflow-hidden rounded-3xl bg-n800 ring-1 ring-n700">
+        <div className="relative grid h-[46vh] max-h-[520px] min-h-[300px] flex-none place-items-center overflow-hidden rounded-3xl bg-n800 ring-1 ring-n700 lg:h-[calc(100dvh-360px)]">
           {selected ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -222,7 +231,10 @@ export function CreativeStudio({
             <div className="absolute bottom-2.5 right-2.5 flex gap-1.5">
               <button
                 onClick={() =>
-                  downloadDataUrl(selected.src, `${pack.id}-${sel + 1}.jpg`)
+                  downloadDataUrl(
+                    selected.src,
+                    `${pack.id}-${sel + 1}.${extensionOf(selected.src)}`
+                  )
                 }
                 className="rounded-full bg-n900/80 px-3 py-1.5 text-[11px] font-bold text-n100 backdrop-blur"
               >
@@ -265,6 +277,9 @@ export function CreativeStudio({
           </div>
         ) : null}
 
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-3">
         {/* MỘT ô dặn AI cho cả hai việc — vẽ lại ảnh này, hoặc tạo lô mới.
             Cả cụm điều khiển chỉ hiện khi ĐÃ có ảnh: chưa có gì để chỉnh thì
             đừng bày đồ chỉnh ra. */}
@@ -350,6 +365,8 @@ export function CreativeStudio({
         ) : null}
 
         {error ? <ErrorNote>{error}</ErrorNote> : null}
+        </div>
+        </div>
 
         <div className="mt-auto flex flex-none items-center justify-between gap-2 pt-1 text-[11.5px] font-semibold">
           <button className="text-a300" onClick={() => setStep("packs")}>
@@ -367,13 +384,13 @@ export function CreativeStudio({
 
   // ── màn chọn phong cách (đã chốt, giữ nguyên) ─────────────────────────────
   return (
-    <div className="screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
       <BackBar onBack={onExit} title={t.flowCreativeTitle} />
       <p className="-mt-2 text-[12.5px] leading-normal text-n400">
         {t.packsSub}
       </p>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
         {PACKS.map((p) => (
           <button
             key={p.id}

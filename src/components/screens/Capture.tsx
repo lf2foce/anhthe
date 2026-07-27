@@ -88,7 +88,7 @@ export function Capture({
   }
 
   return (
-    <div className="screen-in flex h-full flex-col gap-3.5 bg-n900 px-4 pb-6 pt-8 text-n100">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in flex h-full flex-col gap-3.5 bg-n900 px-4 pb-6 pt-8 text-n100">
       <BackBar onBack={onBack} title={t.capTitle} />
 
       <div className="relative flex-1 overflow-hidden rounded-[28px] bg-n800 ring-1 ring-n700">

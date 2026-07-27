@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { checkPhoto, exportFiles, retouchPhoto } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { checkPhoto, exportFiles, fetchQuota, retouchPhoto } from "@/lib/api";
 import { fileToPhoto } from "@/lib/capture";
 import {
   allowedBackgrounds,
@@ -54,6 +55,19 @@ export function Studio({
    * sáng tạo là hai thứ khác nhau, trộn là sinh trạng thái vô nghĩa.
    */
   const [flow, setFlow] = useState<"id" | "creative">("id");
+  /** Đời của lượt thay nền — chống kết quả lượt cũ ghi đè lượt mới */
+  const retouchRun = useRef(0);
+  /**
+   * Số lượt còn lại hôm nay. Đọc lại sau MỖI thao tác tốn model — hiện sai số
+   * lượt còn tệ hơn không hiện, vì khách sẽ tin vào con số rồi bị chặn giữa chừng.
+   */
+  const [quota, setQuota] = useState<{ remaining: number; perDay: number } | null>(
+    null
+  );
+  const refreshQuota = useCallback(() => {
+    fetchQuota().then(setQuota).catch(() => {});
+  }, []);
+  useEffect(refreshQuota, [refreshQuota]);
 
   const t = COPY[lang];
   const patch = useCallback(
@@ -137,6 +151,11 @@ export function Studio({
    */
   async function runRetouch(targets: typeof groups) {
     if (!s.photo || targets.length === 0) return;
+    // Đổi "Làm mịn da" giữa chừng sẽ xoá `retouched`, nhưng vòng lặp đang bay vẫn
+    // ghi đè bằng bản chụp state CŨ — tích xanh hiện cho ảnh sai. Đánh dấu đời của
+    // lượt, kết quả thuộc lượt quá khứ thì bỏ. (CreativeStudio đã có guard này,
+    // luồng ảnh thẻ thì chưa.)
+    const myRun = ++retouchRun.current;
     patch({ retouching: true, error: null });
 
     const evenLighting =
@@ -152,12 +171,16 @@ export function Studio({
           smooth: s.smooth,
           evenLighting,
         });
+        if (retouchRun.current !== myRun) return;
         // Ghi từng nhóm xong ngay: nhóm sau lỗi thì nhóm trước vẫn dùng được.
         setS((prev) => ({ ...prev, retouched: { ...done } }));
       }
-      patch({ retouching: false, files: null });
+      if (retouchRun.current === myRun) patch({ retouching: false, files: null });
     } catch (e) {
-      patch({ retouching: false, error: (e as Error).message });
+      if (retouchRun.current === myRun)
+        patch({ retouching: false, error: (e as Error).message });
+    } finally {
+      refreshQuota();
     }
   }
 
@@ -191,7 +214,9 @@ export function Studio({
     patch({ bgPref, files: null });
   }
   function setSmooth(smooth: boolean) {
-    patch({ smooth, retouched: {}, files: null });
+    // Tăng đời để mọi kết quả đang bay bị bỏ — chúng sinh ra với tham số cũ.
+    retouchRun.current++;
+    patch({ smooth, retouched: {}, retouching: false, files: null });
   }
 
   function reset() {
@@ -218,7 +243,7 @@ export function Studio({
   // (màn hẹp) — định nghĩa một lần để hai bản không trôi khỏi nhau.
   const rail =
     flow === "creative" ? null : (
-      <nav className="flex max-w-[660px] flex-wrap justify-center gap-2 lg:justify-start">
+      <nav className="scr flex flex-nowrap gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap sm:justify-start">
         {SCREENS.map((screen, i) => {
           const on = s.screen === screen;
           const enabled = canGo(screen);
@@ -227,7 +252,7 @@ export function Studio({
               key={screen}
               disabled={!enabled}
               onClick={() => patch({ screen, error: null })}
-              className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-semibold shadow-[inset_0_0_0_1.5px_var(--color-neutral-800)]"
+              className="flex flex-none items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold shadow-[inset_0_0_0_1.5px_var(--color-neutral-800)]"
               style={{
                 color: on ? "var(--color-neutral-100)" : "var(--color-neutral-500)",
               }}
@@ -252,6 +277,21 @@ export function Studio({
 
   // Tên model đọc từ server để nhãn này không nói một đằng chạy một nẻo khi
   // đổi GEMINI_IMAGE_MODEL / GEMINI_TEXT_MODEL.
+  const quotaLine =
+    quota === null ? null : (
+      <span
+        className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+          quota.remaining === 0
+            ? "bg-a900/70 text-a200"
+            : "bg-n800 text-n300"
+        }`}
+      >
+        {lang === "vi"
+          ? `${quota.remaining}/${quota.perDay} lượt hôm nay`
+          : `${quota.remaining}/${quota.perDay} left today`}
+      </span>
+    );
+
   const modelLine = (
     <p className="m-0 text-[11px] text-n600">
       {flow === "creative"
@@ -265,34 +305,33 @@ export function Studio({
   );
 
   return (
-    <div className="relative min-h-dvh bg-n900 px-5 py-8 text-n100">
+    <div className="relative min-h-dvh bg-n900 px-3 py-4 text-n100 sm:px-5 sm:py-6">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-40 h-[520px] w-[520px] rounded-full bg-g800 opacity-55 blur-[110px]" />
         <div className="absolute -bottom-52 -right-36 h-[460px] w-[460px] rounded-full bg-a800 opacity-50 blur-[110px]" />
       </div>
 
-      {/* Màn rộng: chữ nghĩa dồn cột TRÁI, khung máy đứng PHẢI và cao gần hết
-          màn hình — header không còn ăn mất chiều cao của khung. Màn hẹp: xếp
-          dọc như cũ. */}
-      <div className="relative mx-auto flex max-w-[1060px] flex-col items-center gap-6 lg:min-h-[calc(100dvh-64px)] lg:flex-row lg:items-center lg:justify-center lg:gap-16">
-        <div className="flex w-full max-w-[402px] flex-col items-start gap-5 lg:w-[380px] lg:max-w-none">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-a300">
-              {t.brand} · v2
+      {/* KHÔNG nhốt app trong khung điện thoại nữa. Khung 390px cứng làm app
+          trông như bản demo và loại thẳng nhóm trả tiền nhiều nhất (tiệm ảnh,
+          agency ngồi máy bàn). Giờ: mobile chiếm trọn màn, desktop là một thẻ
+          rộng có chiều cao thật. Từng màn tự giới hạn bề rộng đọc được bên trong. */}
+      <div className="relative mx-auto flex w-full max-w-[1120px] flex-col gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/" className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-a300">
+              {t.brand}
             </span>
-            <span className="font-display text-[34px] font-bold leading-none">
+            <span className="font-display text-[22px] font-bold leading-none">
               Ảnh thẻ Studio
             </span>
-            <span className="max-w-[46ch] text-[13.5px] text-n400">
-              {t.tagline}
-            </span>
-          </div>
-          <div className="flex gap-1.5">
+          </Link>
+          <div className="flex items-center gap-1.5">
+            {quotaLine}
             {(["vi", "en"] as const).map((code) => (
               <button
                 key={code}
                 onClick={() => setLang(code)}
-                className="rounded-full px-4 py-2 text-[12.5px] font-semibold shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
+                className="rounded-full px-3.5 py-1.5 text-[12px] font-semibold shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
                 style={{
                   color:
                     lang === code
@@ -304,18 +343,12 @@ export function Studio({
               </button>
             ))}
           </div>
-          <div className="hidden flex-col gap-4 lg:flex">
-            {rail}
-            {modelLine}
-          </div>
-        </div>
+        </header>
 
-        {/* Đúng kích thước iPhone 14: 390×844, BỀ NGANG là gốc.
-            Lấy chiều cao làm gốc (aspect + h-[min(...)]) là sai — cửa sổ thấp thì
-            máy teo ngang còn ~290px, chữ vỡ và nút bẹp. Thà để trang cuộn dọc.
-            Bo góc 47px ≈ tỉ lệ bo thật của máy (~12% bề ngang). */}
-        <main className="relative flex-none">
-          <div className="aspect-[390/844] w-[390px] max-w-full overflow-hidden rounded-[47px] bg-n900 shadow-[0_24px_60px_rgba(0,0,0,.45)] ring-1 ring-n700">
+        {rail}
+
+        <main className="relative w-full">
+          <div className="h-[calc(100dvh-220px)] min-h-[540px] w-full overflow-hidden rounded-3xl bg-n900 shadow-[0_18px_50px_rgba(0,0,0,.4)] ring-1 ring-n800 sm:h-[calc(100dvh-200px)]">
           {flow === "creative" ? (
             <CreativeStudio t={t} lang={lang} onExit={() => setFlow("id")} />
           ) : null}
@@ -428,10 +461,7 @@ export function Studio({
           </div>
         </main>
 
-        <div className="flex flex-col items-center gap-4 lg:hidden">
-          {rail}
-          {modelLine}
-        </div>
+        {modelLine}
       </div>
     </div>
   );

@@ -27,6 +27,8 @@ import {
   sharpExtend,
 } from "@/lib/render";
 
+import { checkSize } from "@/lib/gate";
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -155,6 +157,10 @@ function resolveGroups(raw: unknown): { error: string } | { groups: ResolvedGrou
 }
 
 export async function POST(request: Request) {
+  // Trần dung lượng TRƯỚC khi đọc body — xem lib/gate.ts.
+  const tooBig = checkSize(request);
+  if (tooBig) return tooBig.response;
+
   let body: Body;
   try {
     body = await request.json();

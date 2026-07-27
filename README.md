@@ -4,6 +4,25 @@ Bản chạy thật của prototype `Anh The Studio v2 (offline).html` — giữ
 luồng 6 màn và hệ thiết kế Organic, thay toàn bộ dữ liệu giả bằng camera thật,
 model Gemini thật và file xuất thật.
 
+## Chốt chi phí — đọc trước khi deploy
+
+`src/lib/gate.ts`, ba lớp mạnh dần:
+
+1. **Trần dung lượng** (`checkSize`) — phải là dòng ĐẦU TIÊN của route, trước
+   `request.json()`. Gọi sau khi parse là vô nghĩa: 13MB đã nằm trong bộ nhớ rồi.
+2. **Hạn mức theo cookie ẩn danh** — chỉ chặn tai nạn và lạm dụng vãng lai; xoá
+   cookie là hết. Cố ý chấp nhận, vì mục tiêu là cho người lạ dùng thử được.
+3. **Trần chi toàn cục mỗi ngày** (`PHOTO_GLOBAL_DAILY_CALLS`) — chốt cứng THẬT
+   SỰ, thứ duy nhất chặn được kẻ cố ý. Đặt theo số tiền tối đa chấp nhận mất
+   trong một ngày xấu nhất, KHÔNG đặt theo kỳ vọng lưu lượng.
+
+Hạn mức trừ TRƯỚC khi gọi model, không phải sau khi thành công — trừ sau thì một
+loạt request song song đều thấy bộ đếm còn nguyên và lọt hết.
+
+Bộ đếm nằm trong bộ nhớ tiến trình: đúng với MỘT tiến trình `next start` (VPS,
+Docker), **đếm thiếu trên serverless đa-instance** — lúc đó đổi `bump`/`readCounter`
+sang Redis/KV.
+
 ## Hai luồng
 
 Chọn luồng TRƯỚC mọi thứ khác — chúng khác nhau ở chỗ căn bản, không phải mức độ:
@@ -168,8 +187,11 @@ npm run dev
 Camera cần HTTPS hoặc `localhost`. Nút "Dùng ảnh có sẵn trong máy" chạy được ở
 mọi nơi.
 
+Trang: `/` là landing (tĩnh, có ảnh mẫu thật + giá ở `src/lib/pricing.ts`),
+`/app` là studio.
+
 ```bash
-npm test        # docs + checks + geometry + render + gemini prompt (không gọi mạng)
+npm test        # docs + checks + geometry + render + gemini prompt + gate (không gọi mạng)
 npm run build
 ```
 

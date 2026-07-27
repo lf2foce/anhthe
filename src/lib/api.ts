@@ -79,3 +79,10 @@ export function refineImage(opts: {
 }): Promise<{ image: string }> {
   return post<{ image: string }>("/api/refine", opts);
 }
+
+/** Số lượt còn lại hôm nay — không gọi model nên gọi thoải mái */
+export async function fetchQuota(): Promise<{ remaining: number; perDay: number }> {
+  const res = await fetch("/api/me");
+  if (!res.ok) throw new Error("Không đọc được hạn mức.");
+  return res.json();
+}

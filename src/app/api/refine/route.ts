@@ -13,11 +13,23 @@ import { nearestAspectRatio, stylize } from "@/lib/gemini";
 import { MAX_NOTE_LENGTH, buildRefinePrompt } from "@/lib/packs";
 import { decodeDataUrl, toDataUrl } from "@/lib/imageio";
 import { imageSize } from "@/lib/render";
+import { NextResponse } from "next/server";
+
+import {
+  checkGate,
+  checkSize,
+  isGateFailure,
+  withClientCookie,
+} from "@/lib/gate";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
+  // Trần dung lượng TRƯỚC khi đọc body — xem lib/gate.ts.
+  const tooBig = checkSize(request);
+  if (tooBig) return tooBig.response;
+
   let body: { photo?: string; note?: string; upscale?: boolean };
   try {
     body = await request.json();
@@ -42,6 +54,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const gate = checkGate(request, 1);
+  if (isGateFailure(gate)) return gate.response;
+
   try {
     // Giữ đúng khung của ảnh đang chỉnh — đổi khung là đổi bố cục.
     const size = await imageSize(image.buffer);
@@ -51,7 +66,11 @@ export async function POST(request: Request) {
       aspectRatio: nearestAspectRatio(size.width, size.height),
       imageSize: upscale ? "2K" : undefined,
     });
-    return Response.json({ image: toDataUrl(out.data, out.mimeType) });
+    return withClientCookie(
+      NextResponse.json({ image: toDataUrl(out.data, out.mimeType) }),
+      request,
+      gate.clientId
+    );
   } catch (e) {
     console.error("[api/refine]", e);
     return Response.json({ error: (e as Error).message }, { status: 500 });

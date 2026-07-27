@@ -15,10 +15,16 @@ import { decodeDataUrl } from "@/lib/imageio";
 import { imageSize } from "@/lib/render";
 import type { PhotoCheck } from "@/lib/checks";
 
+import { checkSize } from "@/lib/gate";
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  // Trần dung lượng TRƯỚC khi đọc body — xem lib/gate.ts.
+  const tooBig = checkSize(request);
+  if (tooBig) return tooBig.response;
+
   let body: { photo?: string };
   try {
     body = await request.json();

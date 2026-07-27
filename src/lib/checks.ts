@@ -155,10 +155,26 @@ export function requiredCount(checks: CheckItem[]): number {
  *
  * @param headScales hệ số tỉ lệ đầu RIÊNG từng loại; thiếu thì coi là 1 (đúng target).
  */
+/**
+ * Những tiêu chí mà bước thay nền GIẢI QUYẾT XONG.
+ *
+ * Quan sát của model là trên ảnh GỐC và không bao giờ được chấm lại (chấm lại =
+ * thêm một lần gọi model cho mỗi lần thay nền). Nhưng nền mới thì đã được ĐO
+ * bằng số học (`backgroundDeviation`) — đo đáng tin hơn chấm. Nên khi nền đã đo
+ * là đúng chuẩn, hai tiêu chí này phải được coi là đạt; nếu không thì khách sửa
+ * xong vẫn thấy "nền không đều" đỏ mãi và không hiểu phải làm gì nữa.
+ */
+const RESOLVED_BY_RETOUCH: readonly CheckId[] = [
+  "background_even",
+  "lighting_even",
+];
+
 export function evaluate(
   check: PhotoCheck,
   docIds: string[],
-  headScales: Record<string, number> = {}
+  headScales: Record<string, number> = {},
+  /** Nền của MỌI nhóm đã thay xong và đo ra đúng màu chuẩn */
+  retouchVerified = false
 ): Compliance {
   const specs = docIds.map(getDoc).filter((d) => d !== undefined);
 
@@ -216,7 +232,14 @@ export function evaluate(
 
   const required = requiredChecks(familiesOf(docIds));
   const byId = new Map<CheckId, CheckObservation>();
-  for (const c of check.checks) byId.set(c.id, c);
+  for (const c of check.checks) {
+    byId.set(
+      c.id,
+      retouchVerified && RESOLVED_BY_RETOUCH.includes(c.id)
+        ? { ...c, pass: true, detail: "" }
+        : c
+    );
+  }
   for (const c of computed) byId.set(c.id, c);
 
   const checks: CheckItem[] = CHECK_ORDER.filter((id) => byId.has(id)).map((id) => {

@@ -30,7 +30,7 @@ export function Home({
   const fileRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-8 pt-9 text-n100">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-8 pt-9 text-n100">
       <div className="pointer-events-none absolute -right-16 -top-20 h-60 w-60 rounded-full bg-g800 opacity-50" />
 
       <div className="relative flex flex-col gap-2">
@@ -111,33 +111,26 @@ export function Home({
         })}
       </div>
 
-      <div className="mt-auto flex items-center gap-3.5 pt-2.5">
+      {/* MỘT lời kêu gọi, không phải hai. Bản cũ đặt vòng tròn 86px cạnh một
+          pill nói đúng cùng một câu — trên mobile vòng tròn là chỗ đặt ngón cái,
+          nhưng trên màn rộng nó thành thừa và lệch hẳn. */}
+      <div className="mt-auto flex flex-col gap-2.5 pt-3">
         <button
           onClick={onShoot}
-          className="grid h-[86px] w-[86px] flex-none place-items-center rounded-full bg-accent text-[32px] text-white shadow-lg"
-          aria-label={t.ctaShoot}
+          className="flex items-center justify-center gap-2.5 rounded-full bg-accent py-4 text-[15px] font-bold text-white shadow-lg"
         >
-          ◉
+          <span className="text-[19px] leading-none">◉</span>
+          {t.ctaShoot}
         </button>
-        <div className="flex flex-1 flex-col gap-2">
-          <button
-            onClick={onShoot}
-            className="rounded-full py-3 text-[13px] font-semibold text-n200 shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
-          >
-            {t.ctaShoot}
-          </button>
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="text-left text-[11.5px] font-semibold text-a300 underline underline-offset-2"
-          >
-            {t.ctaUpload}
-          </button>
-          {/* Nói trước là các cỡ khác thêm sau, để người dùng không đi tìm nút
-              chọn nhiều loại ở màn này. */}
-          <span className="pl-0.5 text-[11px] leading-snug text-n500">
-            {t.moreSizesLater}
-          </span>
-        </div>
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="rounded-full py-3 text-[13px] font-semibold text-n200 shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
+        >
+          {t.ctaUpload}
+        </button>
+        <span className="text-center text-[11px] leading-snug text-n500">
+          {t.moreSizesLater}
+        </span>
       </div>
 
       <input

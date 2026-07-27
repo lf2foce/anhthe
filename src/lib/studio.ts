@@ -183,7 +183,19 @@ export function failedBackgrounds(s: StudioState): BackgroundId[] {
  */
 export function compliance(s: StudioState): Compliance | null {
   if (!s.check) return null;
-  return evaluate(s.check, s.picked, s.headScales);
+  return evaluate(s.check, s.picked, s.headScales, retouchVerified(s));
+}
+
+/**
+ * MỌI nhóm nền đã thay xong VÀ đo ra đúng màu chuẩn.
+ *
+ * Phải đủ cả hai vế và phải đúng cho MỌI nhóm: còn một nhóm chưa thay, hoặc một
+ * nhóm thay rồi mà đo ra sai màu, thì kết luận về nền vẫn phải giữ nguyên là chưa đạt.
+ */
+export function retouchVerified(s: StudioState): boolean {
+  const groups = retouchGroups(s);
+  if (groups.length === 0) return false;
+  return groups.every((g) => s.retouched[g.background]?.backgroundOk === true);
 }
 
 /** Payload cho /api/export: mỗi nhóm nền kèm ảnh và landmark của chính nó */

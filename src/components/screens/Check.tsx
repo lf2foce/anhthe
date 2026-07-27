@@ -35,7 +35,7 @@ export function Check({
   onContinue: () => void;
 }) {
   return (
-    <div className="screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
       <BackBar onBack={onBack} title={t.checkTitle} />
 
       {checking ? <Scanning t={t} photo={photo} /> : null}

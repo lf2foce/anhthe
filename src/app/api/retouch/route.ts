@@ -26,6 +26,14 @@ import {
   imageSize,
 } from "@/lib/render";
 import type { FaceLandmarks } from "@/lib/geometry";
+import { NextResponse } from "next/server";
+
+import {
+  checkGate,
+  checkSize,
+  isGateFailure,
+  withClientCookie,
+} from "@/lib/gate";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -44,6 +52,10 @@ export interface RetouchResponse {
 }
 
 export async function POST(request: Request) {
+  // Trần dung lượng TRƯỚC khi đọc body — xem lib/gate.ts.
+  const tooBig = checkSize(request);
+  if (tooBig) return tooBig.response;
+
   let body: {
     photo?: string;
     docId?: string;
@@ -81,6 +93,10 @@ export async function POST(request: Request) {
 
   // Lọc theo họ: ảnh giấy tờ tuỳ thân không mở vest / làm đẹp / upscale sinh ảnh.
   const applied = sanitizeRetouch(spec, body);
+
+  // 2 lượt: một lần sinh ảnh, một lần chấm lại landmark trên ảnh vừa sinh.
+  const gate = checkGate(request, 2);
+  if (isGateFailure(gate)) return gate.response;
 
   let image;
   try {
@@ -136,7 +152,7 @@ export async function POST(request: Request) {
       backgroundDeviation: deviation,
       applied,
     };
-    return Response.json(res);
+    return withClientCookie(NextResponse.json(res), request, gate.clientId);
   } catch (e) {
     console.error("[api/retouch]", e);
     return Response.json({ error: (e as Error).message }, { status: 500 });

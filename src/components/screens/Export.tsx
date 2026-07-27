@@ -88,7 +88,7 @@ export function Export({
   const failing = compliance?.checks.filter((c) => c.required && !c.pass) ?? [];
 
   return (
-    <div className="screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
       <BackBar onBack={onBack} title={t.exportTitle} />
       <p className="-mt-2 text-[12.5px] leading-normal text-n400">
         {t.exportSub}

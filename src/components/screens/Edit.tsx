@@ -77,8 +77,8 @@ export function Edit({
   const doneCount = groups.length - pendingCount;
 
   return (
-    <div className="screen-in isolate flex h-full min-h-0 flex-col overflow-hidden bg-n900">
-      <div className="relative z-10 h-[300px] flex-none overflow-hidden bg-n800">
+    <div className="screen-in isolate flex h-full min-h-0 flex-col overflow-hidden bg-n900 lg:flex-row">
+      <div className="relative z-10 h-[300px] flex-none overflow-hidden bg-n800 lg:h-full lg:min-w-0 lg:flex-1">
         <div className="mx-auto h-full">
           <CropPreview
             photo={working.photo}
@@ -108,8 +108,8 @@ export function Edit({
         </span>
       </div>
 
-      <div className="scr relative z-0 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-t-[30px] bg-bg px-5 pb-6 pt-5 text-ink">
-        <span className="mx-auto h-1 w-11 flex-none rounded-full bg-n400" />
+      <div className="scr relative z-0 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-t-[30px] bg-bg px-5 pb-6 pt-5 text-ink lg:w-[400px] lg:flex-none lg:rounded-l-[30px] lg:rounded-tr-none lg:pt-7">
+        <span className="mx-auto h-1 w-11 flex-none rounded-full bg-n400 lg:hidden" />
 
         {/* Nói rõ đang canh cho loại nào. Thanh trượt tỉ lệ đầu dưới đây chỉ tác
             động lên loại này — các cỡ khác tự canh theo target riêng của chúng. */}

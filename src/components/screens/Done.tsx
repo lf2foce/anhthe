@@ -45,7 +45,7 @@ export function Done({
   const warned = files.filter((f) => f.upscaled || f.warnings.length > 0);
 
   return (
-    <div className="screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-g700 px-5 pb-7 pt-10 text-g100">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-g700 px-5 pb-7 pt-10 text-g100">
       <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-g600 opacity-80" />
 
       <div className="relative flex flex-col gap-2.5">

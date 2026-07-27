@@ -1,5 +1,6 @@
 import "server-only";
 
+import sharp from "sharp";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { FaceLandmarks } from "./geometry";
 import { AI_CHECK_IDS, type AiCheckId } from "./checks";
@@ -344,6 +345,23 @@ export interface RetouchResult {
   mimeType: string;
 }
 
+/**
+ * Model hay trả PNG. Một ảnh 1K PNG ≈ 2,4MB base64; một lô 2 ảnh là ~4,8MB —
+ * vượt trần body 4,5MB của Vercel, và trên 4G thì khách ngồi chờ tải về.
+ * Chuyển sang JPEG ngay tại cửa cắt 75–85% byte mà mắt không phân biệt được.
+ *
+ * `flatten` là BẮT BUỘC và phải nêu MÀU tường minh: PNG có kênh alpha mà encode
+ * thẳng sang JPEG thì phần trong suốt thành ĐEN. Nền đúng của ảnh là thứ chỉ
+ * người gọi biết (thay nền: nền chuẩn của giấy tờ; sáng tạo: không có alpha).
+ */
+async function toJpeg(data: string, flattenTo: string): Promise<RetouchResult> {
+  const buffer = await sharp(Buffer.from(data, "base64"))
+    .flatten({ background: flattenTo })
+    .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+  return { data: buffer.toString("base64"), mimeType: "image/jpeg" };
+}
+
 /** Một lần gọi model sinh ảnh: gửi ảnh + prompt, nhận về đúng một ảnh */
 async function generateImage(opts: {
   model: string;
@@ -351,6 +369,8 @@ async function generateImage(opts: {
   prompt: string;
   aspectRatio: string;
   imageSize?: string;
+  /** Màu lấp phần trong suốt khi model trả PNG có alpha */
+  flattenTo: string;
 }): Promise<RetouchResult> {
   const res = await getClient().models.generateContent({
     model: opts.model,
@@ -379,10 +399,7 @@ async function generateImage(opts: {
   const parts = res.candidates?.[0]?.content?.parts ?? [];
   for (const part of parts) {
     if (part.inlineData?.data) {
-      return {
-        data: part.inlineData.data,
-        mimeType: part.inlineData.mimeType ?? "image/png",
-      };
+      return toJpeg(part.inlineData.data, opts.flattenTo);
     }
   }
 
@@ -402,6 +419,9 @@ export async function retouch(o: RetouchOptions): Promise<RetouchResult> {
     prompt: retouchPrompt(o),
     aspectRatio: nearestAspectRatio(o.width, o.height),
     imageSize: o.hiRes ? (IMAGE_SIZE ?? "2K") : IMAGE_SIZE,
+    // Nền chuẩn của loại giấy tờ — lấp alpha bằng bất cứ màu nào khác là hỏng
+    // đúng thứ bước này vừa làm.
+    flattenTo: o.backgroundHex,
   });
 }
 
@@ -427,5 +447,7 @@ export async function stylize(o: {
     prompt: o.prompt,
     aspectRatio: o.aspectRatio,
     imageSize: o.imageSize ?? IMAGE_SIZE,
+    // Ảnh sáng tạo là cảnh đầy khung, không có alpha; trắng chỉ là chốt an toàn.
+    flattenTo: "#ffffff",
   });
 }

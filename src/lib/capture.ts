@@ -80,3 +80,15 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+
+/**
+ * Đuôi file suy từ CHÍNH data URL, không đặt cứng.
+ *
+ * Đặt cứng ".jpg" rồi đổi codec ở server là giao cho khách file sai đuôi mà
+ * không ai biết — đúng lỗi đã xảy ra một lần ở luồng sáng tạo.
+ */
+export function extensionOf(dataUrl: string): string {
+  const m = /^data:image\/([a-z0-9.+-]+);/i.exec(dataUrl);
+  const sub = (m?.[1] ?? "jpeg").toLowerCase();
+  return sub === "jpeg" ? "jpg" : sub;
+}

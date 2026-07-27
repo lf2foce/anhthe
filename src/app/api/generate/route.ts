@@ -17,6 +17,14 @@ import {
   isAspectChoice,
 } from "@/lib/packs";
 import { decodeDataUrl, toDataUrl } from "@/lib/imageio";
+import { NextResponse } from "next/server";
+
+import {
+  checkGate,
+  checkSize,
+  isGateFailure,
+  withClientCookie,
+} from "@/lib/gate";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -30,6 +38,10 @@ export interface GenerateResponse {
 }
 
 export async function POST(request: Request) {
+  // Trần dung lượng TRƯỚC khi đọc body — xem lib/gate.ts.
+  const tooBig = checkSize(request);
+  if (tooBig) return tooBig.response;
+
   let body: {
     photo?: string;
     packId?: string;
@@ -72,6 +84,11 @@ export async function POST(request: Request) {
     : pack.aspectRatio;
   const imageSize = body.quality === "high" ? "2K" : undefined;
 
+  // Chốt chi phí SAU khi biết `count` (mỗi biến thể = 1 lần gọi model) nhưng
+  // TRƯỚC khi gọi. Trừ trước, không trừ sau khi thành công — xem lib/gate.ts.
+  const gate = checkGate(request, count);
+  if (isGateFailure(gate)) return gate.response;
+
   try {
     const results = await Promise.allSettled(
       Array.from({ length: count }, (_, i) =>
@@ -96,7 +113,7 @@ export async function POST(request: Request) {
     }
 
     const res: GenerateResponse = { packId: pack.id, images };
-    return Response.json(res);
+    return withClientCookie(NextResponse.json(res), request, gate.clientId);
   } catch (e) {
     console.error("[api/generate]", e);
     return Response.json({ error: (e as Error).message }, { status: 500 });
