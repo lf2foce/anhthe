@@ -212,3 +212,31 @@ describe("hình học nhiều spec trên CÙNG một ảnh nguồn", () => {
     }
   });
 });
+
+describe("đối chiếu văn bản 07/2026 — đóng băng kết quả", () => {
+  /**
+   * Hộ chiếu VN là 4×6 nền trắng (mẫu TK01) — KHÔNG phải 3.5×4.5. Nhãn cũ
+   * "Schengen / Hộ chiếu" từng dắt khách làm hộ chiếu sai khổ; giờ hộ chiếu là
+   * loại riêng và Schengen chỉ còn là visa.
+   */
+  it("hộ chiếu VN: loại riêng 4×6 nền trắng, đầu 70–80%", () => {
+    const hc = getDoc("vnhc")!;
+    expect([hc.widthMm, hc.heightMm]).toEqual([40, 60]);
+    expect(hc.backgrounds).toEqual(["white"]);
+    expect(hc.headRatio.min).toBe(0.7);
+    expect(hc.headRatio.max).toBe(0.8);
+    expect(hc.verified).toBe(true);
+    expect(getDoc("schen")!.vi).not.toContain("Hộ chiếu");
+  });
+
+  it("thi cử: 4×6 kiểu căn cước (quy chế THPT), digital ≥ 400×600", () => {
+    const exam = getDoc("exam")!;
+    expect([exam.widthMm, exam.heightMm]).toEqual([40, 60]);
+    expect(exam.digital!.width).toBeGreaterThanOrEqual(400);
+    expect(exam.digital!.height).toBeGreaterThanOrEqual(600);
+  });
+
+  it("mọi loại giấy tờ tuỳ thân đều đã đối chiếu xong — hết cảnh báo unverified", () => {
+    for (const d of docsOf("id")) expect(d.verified).toBe(true);
+  });
+});
