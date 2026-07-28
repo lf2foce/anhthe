@@ -150,8 +150,9 @@ body {
 
 body {
   margin: 0;
-  background: var(--color-neutral-900);
-  color: var(--color-text);
+  /* Nền sáng pop — redesign đợt 4. Vùng overscroll/khe hở giờ cùng màu app. */
+  background: var(--color-pop-bg);
+  color: var(--color-pop-ink);
   font-family: var(--font-figtree), system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.55;
@@ -172,11 +173,11 @@ h3 {
   outline: none;
 }
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-viol);
   outline-offset: 2px;
 }
 ::selection {
-  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--color-viol) 25%, transparent);
 }
 
 button {
@@ -206,7 +207,7 @@ input[type="range"] {
   width: 100%;
   height: 6px;
   border-radius: 999px;
-  background: var(--color-neutral-300);
+  background: color-mix(in srgb, var(--color-pop-ink) 12%, transparent);
   outline: none;
 }
 input[type="range"]::-webkit-slider-thumb {
@@ -215,17 +216,16 @@ input[type="range"]::-webkit-slider-thumb {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: var(--color-accent);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: var(--color-viol);
+  border: 2px solid var(--color-pop-ink);
   cursor: pointer;
 }
 input[type="range"]::-moz-range-thumb {
   width: 22px;
   height: 22px;
-  border: 0;
+  border: 2px solid var(--color-pop-ink);
   border-radius: 999px;
-  background: var(--color-accent);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: var(--color-viol);
   cursor: pointer;
 }
 

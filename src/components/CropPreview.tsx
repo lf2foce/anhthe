@@ -43,7 +43,7 @@ function Band({
   const top = clamp(Math.min(fromTop, toTop));
   const height = clamp(Math.abs(toTop - fromTop));
   const line = clamp(atTop);
-  const color = ok ? "var(--color-accent-2-400)" : "var(--color-accent)";
+  const color = ok ? "var(--color-mint)" : "var(--color-pink)";
 
   return (
     <>
@@ -54,8 +54,8 @@ function Band({
           top: `${top * 100}%`,
           height: `${height * 100}%`,
           background: ok
-            ? "color-mix(in srgb, var(--color-accent-2-400) 16%, transparent)"
-            : "color-mix(in srgb, var(--color-accent) 14%, transparent)",
+            ? "color-mix(in srgb, var(--color-mint) 14%, transparent)"
+            : "color-mix(in srgb, var(--color-pink) 12%, transparent)",
           borderTop: `1px dashed ${color}`,
           borderBottom: `1px dashed ${color}`,
         }}

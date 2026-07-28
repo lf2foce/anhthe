@@ -1,12 +1,19 @@
 "use client";
 
-/** Mảnh giao diện dùng lại giữa các màn — giữ đúng hình dáng của prototype. */
+/**
+ * Mảnh giao diện dùng lại giữa các màn — ngôn ngữ "pop": viền mực 2px + bóng
+ * lệch cứng, nền sáng, 5 màu kẹo. Đổi ở đây là cả app đổi theo — các màn chỉ
+ * được thêm màu qua token pop, không tự chế thang màu riêng.
+ *
+ * Prop `dark` ở vài mảnh vẫn giữ: Studio sáng tạo và sân khấu soi ảnh còn nền
+ * tối — nền tối là ĐÚNG cho việc xem ảnh, không phải đồ cũ chưa dọn.
+ */
 
 import type { ReactNode } from "react";
 
 export function Kicker({ children }: { children: ReactNode }) {
   return (
-    <span className="text-[10.5px] font-bold uppercase tracking-[0.2em] text-a300">
+    <span className="text-[10.5px] font-bold uppercase tracking-[0.2em] text-pink">
       {children}
     </span>
   );
@@ -29,7 +36,7 @@ export function BackBar({
         className={`grid h-9 w-9 flex-none place-items-center rounded-full text-[15px] ${
           dark
             ? "text-n300 shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
-            : "text-ink shadow-[inset_0_0_0_1.5px_var(--color-neutral-400)]"
+            : "border-2 border-pop-ink bg-white text-pop-ink"
         }`}
       >
         ←
@@ -59,18 +66,16 @@ export function Toggle({
     >
       <span className="flex flex-col gap-0.5">
         <span className="text-[12.5px] font-semibold">{label}</span>
-        {sub ? <span className="text-[11px] text-n600">{sub}</span> : null}
+        {sub ? <span className="text-[11px] text-pop-ink/50">{sub}</span> : null}
       </span>
       <span
-        className="flex h-[26px] w-11 flex-none items-center rounded-full p-[3px] transition-all duration-150"
+        className="flex h-[26px] w-11 flex-none items-center rounded-full border-2 border-pop-ink p-[2px] transition-all duration-150"
         style={{
-          background: on
-            ? "var(--color-accent-2-600)"
-            : "var(--color-neutral-400)",
+          background: on ? "var(--color-mint)" : "var(--color-pop-bg)",
           justifyContent: on ? "flex-end" : "flex-start",
         }}
       >
-        <span className="h-5 w-5 rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,.25)]" />
+        <span className="h-[18px] w-[18px] rounded-full border-2 border-pop-ink bg-white" />
       </span>
     </button>
   );
@@ -79,12 +84,12 @@ export function Toggle({
 export function Dot({ ok, size = 22 }: { ok: boolean; size?: number }) {
   return (
     <span
-      className="grid flex-none place-items-center rounded-full font-bold text-white"
+      className="grid flex-none place-items-center rounded-full border-2 border-pop-ink font-bold text-white"
       style={{
         width: size,
         height: size,
-        fontSize: size * 0.55,
-        background: ok ? "var(--color-accent-2-500)" : "var(--color-accent)",
+        fontSize: size * 0.5,
+        background: ok ? "var(--color-mint)" : "var(--color-pink)",
       }}
     >
       {ok ? "✓" : "!"}
@@ -92,21 +97,21 @@ export function Dot({ ok, size = 22 }: { ok: boolean; size?: number }) {
   );
 }
 
-/** Vòng điểm n/8 — conic-gradient như prototype */
+/** Vòng điểm n/8 — conic-gradient, mint trên nền giấy */
 export function ScoreRing({ value, total }: { value: number; total: number }) {
   const pct = total > 0 ? (value / total) * 100 : 0;
   return (
     <div
-      className="relative grid h-[104px] w-[104px] flex-none place-items-center rounded-full"
+      className="relative grid h-[104px] w-[104px] flex-none place-items-center rounded-full border-2 border-pop-ink"
       style={{
-        background: `conic-gradient(var(--color-accent-2-400) 0 ${pct}%, var(--color-neutral-800) ${pct}% 100%)`,
+        background: `conic-gradient(var(--color-mint) 0 ${pct}%, var(--color-mint-1) ${pct}% 100%)`,
       }}
     >
-      <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-n900">
-        <span className="font-display text-[30px] font-bold leading-none text-g300">
+      <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full border-2 border-pop-ink bg-white">
+        <span className="font-display text-[30px] font-bold leading-none">
           {value}
         </span>
-        <span className="text-[10px] text-n500">/ {total}</span>
+        <span className="text-[10px] text-pop-ink/50">/ {total}</span>
       </div>
     </div>
   );
@@ -124,15 +129,15 @@ export function PrimaryButton({
   tone?: "accent" | "ink" | "cream";
 }) {
   const tones = {
-    accent: "bg-accent text-white",
-    ink: "bg-n900 text-n100",
-    cream: "bg-g100 text-g800",
+    accent: "bg-viol text-white",
+    ink: "bg-pop-ink text-white",
+    cream: "bg-white text-pop-ink",
   } as const;
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`w-full rounded-full px-4 py-[15px] text-[14.5px] font-bold ${tones[tone]}`}
+      className={`w-full rounded-full border-2 border-pop-ink px-4 py-[15px] text-[14.5px] font-bold shadow-[3px_3px_0_var(--color-pop-ink)] ${tones[tone]}`}
     >
       {children}
     </button>
@@ -154,10 +159,10 @@ export function GhostButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`w-full rounded-full px-[18px] py-3.5 text-[13px] font-semibold ${
+      className={`w-full rounded-full px-[18px] py-3.5 text-[13px] font-bold ${
         dark
           ? "text-n300 shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
-          : "text-ink shadow-[inset_0_0_0_1.5px_var(--color-neutral-400)]"
+          : "border-2 border-pop-ink bg-white text-pop-ink"
       }`}
     >
       {children}
@@ -167,16 +172,24 @@ export function GhostButton({
 
 export function ErrorNote({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl bg-a900/60 px-3.5 py-3 text-[12px] leading-snug text-a200 shadow-[inset_0_0_0_1px_var(--color-accent-700)]">
+    <div className="rounded-2xl border-2 border-pink bg-pink-1 px-3.5 py-3 text-[12px] leading-snug text-pop-ink">
       {children}
     </div>
   );
 }
 
 export function Spinner({ label }: { label: string }) {
+  // Màu chữ + vòng theo currentColor: spinner sống cả trên nền sáng lẫn nền
+  // tối của Studio sáng tạo mà không cần prop dark.
   return (
-    <div className="flex items-center gap-2.5 text-[12.5px] text-n400">
-      <span className="h-4 w-4 flex-none animate-spin rounded-full border-2 border-n700 border-t-accent" />
+    <div className="flex items-center gap-2.5 text-[12.5px] opacity-75">
+      <span
+        className="h-4 w-4 flex-none animate-spin rounded-full border-2"
+        style={{
+          borderColor: "color-mix(in srgb, currentColor 25%, transparent)",
+          borderTopColor: "var(--color-viol)",
+        }}
+      />
       {label}
     </div>
   );

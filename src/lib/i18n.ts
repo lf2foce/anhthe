@@ -178,8 +178,7 @@ export const COPY: Record<Lang, Copy> = {
     sectionFormat: "Căn đúng chuẩn giấy tờ",
     sectionExtra: "Làm đẹp thêm (tuỳ chọn)",
     bgLabel: "Nền ảnh",
-    bgRule:
-      "Nền do chuẩn của từng loại giấy tờ quyết định. Bạn chỉ đổi được trong phạm vi loại đó cho phép.",
+    bgRule: "Chuẩn giấy tờ quyết định màu nền — màu không được phép sẽ tự khoá.",
     bright: "Độ sáng",
     headRatio: "Tỉ lệ đầu",
     smooth: "Làm mịn da nhẹ (giữ nét tự nhiên)",
@@ -314,8 +313,7 @@ export const COPY: Record<Lang, Copy> = {
     sectionFormat: "Match the document format",
     sectionExtra: "Optional touch-ups",
     bgLabel: "Background",
-    bgRule:
-      "Each document type dictates its background. You can only change it within what that type allows.",
+    bgRule: "The document standard decides the background — forbidden colours are locked.",
     bright: "Brightness",
     headRatio: "Head size",
     smooth: "Light skin smoothing (keeps texture)",

@@ -30,7 +30,6 @@ import {
   workingFor,
   type Screen,
   type StudioState,
-  type Working,
 } from "@/lib/studio";
 import { CreativeStudio } from "./creative/CreativeStudio";
 import { Home } from "./screens/Home";
@@ -251,7 +250,7 @@ export function Studio() {
   // (màn hẹp) — định nghĩa một lần để hai bản không trôi khỏi nhau.
   const rail =
     flow === "creative" ? null : (
-      <nav className="scr flex flex-nowrap gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap sm:justify-start">
+      <nav className="scr flex flex-nowrap gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap sm:justify-center">
         {SCREENS.map((screen, i) => {
           const on = s.screen === screen;
           const enabled = canGo(screen);
@@ -301,12 +300,11 @@ export function Studio() {
     // Shell SÁNG theo ngôn ngữ pop — ý "phòng tối" (khung nâu tối bao quanh)
     // bỏ hẳn: nó nhốt nội dung trong một hộp nặng nề và lệch tông với phần còn
     // lại của thương hiệu mới.
+    // Nền TRƠN, không bóng bay trang trí: chúng sinh ra để làm mềm cái khung
+    // tối cũ — khung bỏ rồi thì mảng màu mờ cùng tông ở góc đọc ra là vệt lỗi
+    // chứ không phải chủ ý (khách chỉ đúng chỗ này). Trang trí là việc của
+    // landing; trong app, ảnh của khách là thứ duy nhất được phép nổi.
     <div className="relative min-h-dvh overflow-x-clip bg-pop-bg px-3 py-4 font-body text-pop-ink sm:px-5 sm:py-6">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-28 -top-24 h-80 w-80 rounded-full bg-viol-1" />
-        <div className="absolute -bottom-32 -right-24 h-72 w-72 rounded-full bg-sun-1" />
-      </div>
-
       {/* KHÔNG nhốt app trong khung điện thoại nữa. Khung 390px cứng làm app
           trông như bản demo và loại thẳng nhóm trả tiền nhiều nhất (tiệm ảnh,
           agency ngồi máy bàn). Giờ: mobile chiếm trọn màn, desktop là một thẻ

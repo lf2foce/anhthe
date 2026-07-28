@@ -86,15 +86,14 @@ export function Done({
   const warned = files.filter((f) => f.upscaled || f.warnings.length > 0);
 
   return (
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-g700 px-5 pb-7 pt-10 text-g100">
-      <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-g600 opacity-80" />
-
+    // Màn ăn mừng: nền sáng + mint, cùng ngôn ngữ pop với cả app.
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-7 pt-9 font-body text-pop-ink">
       <div className="relative flex flex-col gap-2.5">
-        <span className="grid h-[74px] w-[74px] place-items-center rounded-full bg-g100 text-[34px] text-g800">
+        <span className="grid h-[74px] w-[74px] -rotate-3 place-items-center rounded-full border-2 border-pop-ink bg-mint text-[34px] text-white shadow-[4px_4px_0_var(--color-pop-ink)]">
           ✓
         </span>
-        <h2 className="mt-1.5 text-[30px] leading-[1.08]">{t.doneTitle}</h2>
-        <p className="m-0 max-w-[30ch] text-[13px] leading-normal text-g200">
+        <h2 className="mt-1.5 font-display text-[30px] font-bold leading-[1.08]">{t.doneTitle}</h2>
+        <p className="m-0 max-w-[34ch] text-[13px] leading-normal text-pop-ink/60">
           {t.doneSub}
         </p>
       </div>
@@ -103,21 +102,21 @@ export function Done({
         {files.map((f) => (
           <div
             key={f.name}
-            className="flex items-center gap-3 border-t border-g100/20 px-0.5 py-2.5"
+            className="flex items-center gap-3 border-t border-pop-ink/10 px-0.5 py-2.5"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={f.img.url}
               alt=""
-              className="h-[38px] w-[28px] flex-none rounded object-cover"
+              className="h-[38px] w-[28px] flex-none border border-pop-ink/25 object-cover"
             />
             <div className="flex flex-1 flex-col gap-px">
               <span className="text-[12.5px] font-semibold">{f.name}</span>
-              <span className="text-[10.5px] text-g300">
+              <span className="text-[10.5px] text-pop-ink/50">
                 {f.meta} · {formatBytes(f.bytes)}
               </span>
               {f.upscaled ? (
-                <span className="text-[10.5px] text-a300">
+                <span className="text-[10.5px] text-pink">
                   {lang === "vi"
                     ? "Đã phóng to từ ảnh gốc — in ra có thể hơi mềm nét"
                     : "Upscaled from the source — may look soft in print"}
@@ -126,7 +125,7 @@ export function Done({
             </div>
             <button
               onClick={() => downloadUrl(downloadPath(f), f.name)}
-              className="rounded-full px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider text-g200 shadow-[inset_0_0_0_1.5px_rgba(240,250,225,.45)]"
+              className="rounded-full border-2 border-pop-ink bg-white px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider"
             >
               {t.downloadOne}
             </button>
@@ -135,7 +134,7 @@ export function Done({
       </div>
 
       {warned.some((f) => f.warnings.length) ? (
-        <ul className="m-0 list-disc space-y-1 pl-4 text-[11px] leading-snug text-a200">
+        <ul className="m-0 list-disc space-y-1 pl-4 text-[11px] leading-snug text-pink">
           {warned.flatMap((f) =>
             f.warnings.map((w) => <li key={`${f.name}-${w}`}>{`${f.label}: ${w}`}</li>)
           )}
@@ -159,7 +158,7 @@ export function Done({
         </PrimaryButton>
         <button
           onClick={onAgain}
-          className="rounded-full py-2.5 text-[12.5px] font-semibold text-g200"
+          className="rounded-full py-2.5 text-[12.5px] font-bold text-pop-ink/60"
         >
           {t.again}
         </button>

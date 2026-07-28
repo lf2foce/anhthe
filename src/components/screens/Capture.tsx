@@ -88,10 +88,13 @@ export function Capture({
   }
 
   return (
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in flex h-full flex-col gap-3.5 bg-n900 px-4 pb-6 pt-8 text-n100">
-      <BackBar onBack={onBack} title={t.capTitle} />
+    // Khung ngoài SÁNG như cả app; chỉ RIÊNG viewfinder là thẻ tối — video vốn
+    // tối, và một tấm thẻ tối có viền đọc ra là "màn hình máy ảnh" chứ không
+    // phải cả căn phòng tối đè lên giao diện.
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in flex h-full flex-col gap-3.5 bg-pop-bg px-4 pb-6 pt-8 font-body text-pop-ink">
+      <BackBar onBack={onBack} title={t.capTitle} dark={false} />
 
-      <div className="relative flex-1 overflow-hidden rounded-[28px] bg-n800 ring-1 ring-n700">
+      <div className="relative flex-1 overflow-hidden rounded-[28px] border-2 border-pop-ink bg-viol-1 shadow-[5px_5px_0_var(--color-pop-ink)]">
         {shot ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={shot} alt="" className="h-full w-full object-cover" />
@@ -107,22 +110,26 @@ export function Capture({
         )}
 
         {cam === "denied" && !shot ? (
-          <div className="absolute inset-0 grid place-items-center px-6 text-center text-[12.5px] text-n400">
+          <div className="absolute inset-0 grid place-items-center px-6 text-center text-[12.5px] font-semibold text-pop-ink/60">
             {t.camDenied}
           </div>
         ) : null}
 
         {!shot ? (
           <>
-            <div className="pointer-events-none absolute left-1/2 top-[48%] aspect-[0.78] w-[64%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-[2.5px] border-accent" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-1.5 bg-gradient-to-t from-black/55 to-transparent p-3.5">
+            {/* max-h: oval tính theo bề RỘNG nên khung ngang thấp (desktop) bị
+                cắt đỉnh; kẹp theo chiều cao thì tỉ lệ hơi giãn trên màn ngang —
+                chấp nhận được vì nó là đường gióng, không phải thước đo. */}
+            <div className="pointer-events-none absolute left-1/2 top-[48%] aspect-[0.78] max-h-[86%] w-[64%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-[2.5px] border-dashed border-pop-ink/60" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-start gap-1.5 p-3">
               {t.tips.map((tip) => (
-                <div key={tip} className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 flex-none animate-[pulse_2.2s_ease-in-out_infinite] rounded-full bg-g300" />
-                  <span className="text-[11.5px] leading-tight text-n100">
-                    {tip}
-                  </span>
-                </div>
+                <span
+                  key={tip}
+                  className="flex items-center gap-1.5 rounded-full border border-pop-ink/25 bg-white/90 px-2.5 py-1 text-[10.5px] font-semibold leading-tight text-pop-ink"
+                >
+                  <span className="h-1.5 w-1.5 flex-none rounded-full bg-mint" />
+                  {tip}
+                </span>
               ))}
             </div>
           </>
@@ -141,24 +148,28 @@ export function Capture({
       ) : (
         <>
           <div className="flex items-center gap-3">
-            <span className="flex-1 text-[11.5px] font-bold text-n400">
+            <span className="flex-1 text-[11.5px] font-bold text-pop-ink/50">
               {cam === "starting" ? t.camStarting : ""}
             </span>
             <button
               onClick={() => fileRef.current?.click()}
-              className="text-[11.5px] font-semibold text-a300 underline underline-offset-2"
+              className="text-[11.5px] font-bold text-viol underline underline-offset-2"
             >
               {t.useUpload}
             </button>
           </div>
-          <button
-            onClick={shoot}
-            disabled={cam !== "live"}
-            aria-label={t.shutterHint}
-            className="grid h-[78px] w-[78px] flex-none place-self-center place-items-center rounded-full shadow-[inset_0_0_0_3px_var(--color-neutral-100)]"
-          >
-            <span className="h-[60px] w-[60px] rounded-full bg-accent" />
-          </button>
+          {/* Bọc div: [&>*]:w-full của wrapper chỉ với tới CON TRỰC TIẾP — thiếu
+              lớp bọc thì nút tròn 78px bị kéo thành pill bự (đã dính). */}
+          <div className="grid place-items-center">
+            <button
+              onClick={shoot}
+              disabled={cam !== "live"}
+              aria-label={t.shutterHint}
+              className="grid h-[78px] w-[78px] place-items-center rounded-full shadow-[inset_0_0_0_3px_var(--color-pop-ink)]"
+            >
+              <span className="h-[60px] w-[60px] rounded-full bg-viol" />
+            </button>
+          </div>
         </>
       )}
 
