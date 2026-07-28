@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeCrop,
   extendToFit,
+  guideBands,
   resolutionCheck,
   type FaceLandmarks,
 } from "./geometry";
@@ -182,6 +183,61 @@ describe("nới khung không làm sai phép đo độ phân giải", () => {
     expect(after.errors).toEqual([]);
     // Khung đã đủ rộng để đúng chuẩn hình học, nhưng pixel đầu không tự sinh ra.
     expect(resolutionCheck(after.crop, target).ok).toBe(false);
+  });
+});
+
+describe("guideBands — dải hướng dẫn trên preview", () => {
+  const roomy = { crownY: 0.12, chinY: 0.47, eyeMidY: 0.22, faceCenterX: 0.5 };
+
+  /**
+   * Nhãn hiện "mắt 62%" mà đường kẻ vẽ ở chỗ khác thì hướng dẫn còn hại hơn
+   * không có. Cả hai phải suy từ CÙNG một `CropResult`.
+   */
+  it("đường thực tế khớp đúng con số trên nhãn", () => {
+    const fit = computeCrop(roomy, 2000, 2667, us);
+    const b = guideBands(roomy, us, fit);
+    expect(b.eye.at).toBeCloseTo(1 - fit.eyeFromBottom, 6);
+  });
+
+  it("ảnh đạt chuẩn thì đường nằm TRONG dải và báo ok", () => {
+    const fit = computeCrop(roomy, 2000, 2667, us);
+    const b = guideBands(roomy, us, fit);
+    expect(b.eye.ok).toBe(true);
+    expect(b.crown.ok).toBe(true);
+    expect(b.eye.at).toBeGreaterThanOrEqual(b.eye.from);
+    expect(b.eye.at).toBeLessThanOrEqual(b.eye.to);
+    expect(b.crown.at).toBeGreaterThanOrEqual(b.crown.from - 1e-9);
+    expect(b.crown.at).toBeLessThanOrEqual(b.crown.to + 1e-9);
+  });
+
+  it("ảnh trượt chuẩn thì báo KHÔNG ok — đây là toàn bộ lý do dải tồn tại", () => {
+    // Ảnh chụp quá sát: khung bị kẹp, đường mắt rơi ra ngoài dải.
+    const tight = { crownY: 0.06, chinY: 0.7, eyeMidY: 0.28, faceCenterX: 0.5 };
+    const link = getDoc("link")!;
+    const fit = computeCrop(tight, 600, 800, link);
+    expect(fit.errors.length).toBeGreaterThan(0);
+    const b = guideBands(tight, link, fit);
+    expect(b.eye.ok && b.crown.ok).toBe(false);
+  });
+
+  /**
+   * Vị trí đỉnh đầu suy từ landmark của CHÍNH người đó, không dùng hằng số nhân
+   * trắc chung — bản đầu nhân bừa 0.62 và sai với mọi khuôn mặt khác tỉ lệ đó.
+   */
+  it("người có trán cao và người có trán thấp cho dải đỉnh đầu KHÁC nhau", () => {
+    const tranCao = { crownY: 0.10, chinY: 0.50, eyeMidY: 0.30, faceCenterX: 0.5 };
+    const tranThap = { crownY: 0.10, chinY: 0.50, eyeMidY: 0.22, faceCenterX: 0.5 };
+    const a = guideBands(tranCao, us, computeCrop(tranCao, 2000, 2667, us));
+    const b = guideBands(tranThap, us, computeCrop(tranThap, 2000, 2667, us));
+    expect(Math.abs(a.crown.at - b.crown.at)).toBeGreaterThan(0.02);
+  });
+
+  it("landmark vô lý thì không nổ, không sinh NaN", () => {
+    const bad = { crownY: 0.5, chinY: 0.5, eyeMidY: 0.5, faceCenterX: 0.5 };
+    const b = guideBands(bad, us, computeCrop(bad, 1000, 1000, us));
+    for (const v of [b.eye.at, b.eye.from, b.eye.to, b.crown.at]) {
+      expect(Number.isFinite(v)).toBe(true);
+    }
   });
 });
 

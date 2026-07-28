@@ -78,22 +78,23 @@ export function Edit({
 
   return (
     <div className="screen-in isolate flex h-full min-h-0 flex-col overflow-hidden bg-n900 lg:flex-row">
-      <div className="relative z-10 h-[300px] flex-none overflow-hidden bg-n800 lg:h-full lg:min-w-0 lg:flex-1">
-        <div className="mx-auto h-full">
-          <CropPreview
-            photo={working.photo}
-            landmarks={working.landmarks}
-            imgW={working.width}
-            imgH={working.height}
-            spec={spec}
-            backgroundHex={bgHex(bg)}
-            headScale={headScale}
-            brightness={brightness}
-            guides
-            crownLabel={t.crownLine}
-            className="mx-auto h-full"
-          />
-        </div>
+      {/* Khung ảnh CANH GIỮA có đệm quanh, không dán sát mép. Ảnh dán sát mép
+          thì phần nới khung (nền thêm vào quanh đầu) trông như lỗi render; có
+          đệm và viền thì nó đọc ra là một tấm ảnh thành phẩm đặt trên bàn. */}
+      <div className="relative z-10 grid h-[300px] flex-none place-items-center overflow-hidden bg-n800 p-4 lg:h-full lg:min-w-0 lg:flex-1 lg:p-8">
+        <CropPreview
+          photo={working.photo}
+          landmarks={working.landmarks}
+          imgW={working.width}
+          imgH={working.height}
+          spec={spec}
+          backgroundHex={bgHex(bg)}
+          headScale={headScale}
+          brightness={brightness}
+          guides
+          labels={{ crown: t.crownLine, eye: t.eyeLine }}
+          className="max-h-full max-w-full rounded-lg shadow-[0_8px_28px_rgba(0,0,0,.45)] ring-1 ring-n700"
+        />
         {/* Nút này nằm ĐÈ lên ảnh, nên nền mờ 55% biến nó thành vô hình trên ảnh
             sáng. Dùng nền đặc + viền sáng + đổ bóng để nổi trên mọi ảnh. */}
         <button
@@ -103,9 +104,6 @@ export function Edit({
         >
           ←
         </button>
-        <span className="absolute right-4 top-4 rounded-full bg-bg/80 px-2.5 py-1 text-[12.5px] font-bold text-ink">
-          {lang === "vi" ? "đầu" : "head"} {(fit.headRatio * 100).toFixed(0)}%
-        </span>
       </div>
 
       <div className="scr relative z-0 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-t-[30px] bg-bg px-5 pb-6 pt-5 text-ink lg:w-[400px] lg:flex-none lg:rounded-l-[30px] lg:rounded-tr-none lg:pt-7">
@@ -267,9 +265,24 @@ export function Edit({
               : t.bgDone}
           </div>
         ) : (
-          <GhostButton onClick={onRetouch} dark={false}>
-            {pendingCount > 1 ? `${t.applyBg} (${pendingCount}×)` : t.applyBg}
-          </GhostButton>
+          // Đây là bước BẮT BUỘC của luồng, không phải tuỳ chọn phụ. Bản cũ để
+          // nó là nút phụ mờ tên "Thay nền bằng AI" — vừa nói về CƠ CHẾ thay vì
+          // kết quả, vừa trông như thứ bỏ qua được, trong khi bỏ qua là nhận
+          // file nền phòng khách.
+          <div className="flex flex-col gap-2 rounded-2xl bg-n900 p-3.5 text-n100">
+            <span className="text-[13px] font-bold">{t.improveTitle}</span>
+            <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[11.5px] leading-snug text-n400">
+              {t.improveSteps.map((x) => (
+                <li key={x} className="flex gap-1.5">
+                  <span className="text-g400">→</span>
+                  {x}
+                </li>
+              ))}
+            </ul>
+            <PrimaryButton onClick={onRetouch}>
+              {pendingCount > 1 ? `${t.improveCta} (${pendingCount}×)` : t.improveCta}
+            </PrimaryButton>
+          </div>
         )}
 
         <p className="m-0 text-[11px] leading-snug text-g700">{t.editNote}</p>

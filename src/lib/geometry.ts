@@ -137,6 +137,52 @@ export function computeCrop(
   };
 }
 
+/**
+ * Vị trí để VẼ dải hướng dẫn trên preview, quy về tỉ lệ 0..1 tính từ đỉnh khung.
+ *
+ * Vẽ một đường "đỉnh đầu ở đây" là thông tin vô dụng — người dùng không thuộc
+ * chuẩn để biết thế là đúng hay sai. Vẽ DẢI cho phép kèm đường thực tế nằm
+ * trong/ngoài dải thì tự nó trả lời câu hỏi duy nhất khách quan tâm: đạt chưa.
+ *
+ * Đường thực tế suy từ chính `CropResult` chứ không tính lại, để con số trên
+ * nhãn và vị trí đường kẻ không bao giờ nói hai chuyện khác nhau.
+ */
+export function guideBands(
+  lm: FaceLandmarks,
+  spec: DocSpec,
+  fit: CropResult
+): {
+  eye: { from: number; to: number; at: number; ok: boolean };
+  crown: { from: number; to: number; at: number; ok: boolean };
+} {
+  // `eyeFromBottom` đo từ MÉP DƯỚI nên phải lật khi vẽ từ trên xuống.
+  const eyeAt = 1 - fit.eyeFromBottom;
+
+  // Tỉ lệ mắt nằm ở đâu trên chiều cao đầu — đo từ landmark của CHÍNH người này,
+  // không dùng hằng số nhân trắc chung. Mỗi người một khác, và số đo đã có sẵn.
+  const headSpan = lm.chinY - lm.crownY;
+  const eyeInHead = headSpan > 0 ? (lm.eyeMidY - lm.crownY) / headSpan : 0.5;
+
+  return {
+    eye: {
+      from: 1 - spec.eyeFromBottom.max,
+      to: 1 - spec.eyeFromBottom.min,
+      at: eyeAt,
+      ok:
+        fit.eyeFromBottom >= spec.eyeFromBottom.min &&
+        fit.eyeFromBottom <= spec.eyeFromBottom.max,
+    },
+    crown: {
+      from: eyeAt - spec.headRatio.max * eyeInHead,
+      to: eyeAt - spec.headRatio.min * eyeInHead,
+      at: eyeAt - fit.headRatio * eyeInHead,
+      ok:
+        fit.headRatio >= spec.headRatio.min &&
+        fit.headRatio <= spec.headRatio.max,
+    },
+  };
+}
+
 // ── Nới khung: thêm khoảng trống quanh đầu bằng SỐ HỌC ────────────────────────
 
 export interface CanvasPad {

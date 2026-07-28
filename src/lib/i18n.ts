@@ -51,6 +51,11 @@ export interface Copy {
   sharpen: string;
   sharpenSub: string;
   crownLine: string;
+  eyeLine: string;
+  /** Bước xử lý ảnh — đặt tên theo KẾT QUẢ, không theo cơ chế */
+  improveTitle: string;
+  improveSteps: readonly string[];
+  improveCta: string;
   editNote: string;
   editCta: string;
   applying: string;
@@ -160,7 +165,15 @@ export const COPY: Record<Lang, Copy> = {
     smooth: "Làm mịn da nhẹ (giữ nét tự nhiên)",
     sharpen: "Làm nét ảnh",
     sharpenSub: "Tăng nét chi tiết đang có — không bịa thêm chi tiết mặt",
-    crownLine: "đỉnh đầu",
+    crownLine: "đầu",
+    eyeLine: "mắt",
+    improveTitle: "Chuẩn hoá ảnh",
+    improveSteps: [
+      "Thay nền đúng màu quy định",
+      "Canh khung vào đúng tỉ lệ chuẩn",
+      "Cân sáng và làm mịn nhẹ",
+    ],
+    improveCta: "Chuẩn hoá ảnh",
     editNote:
       "Mọi chỉnh sửa đều nằm trong giới hạn cho phép của từng loại giấy tờ.",
     editCta: "Xem bản xuất",
@@ -272,7 +285,15 @@ export const COPY: Record<Lang, Copy> = {
     smooth: "Light skin smoothing (keeps texture)",
     sharpen: "Sharpen",
     sharpenSub: "Boosts detail that is already there — invents nothing",
-    crownLine: "crown",
+    crownLine: "head",
+    eyeLine: "eyes",
+    improveTitle: "Make it compliant",
+    improveSteps: [
+      "Replace the background with the required colour",
+      "Fit the crop to the exact required ratio",
+      "Even out the light, light skin smoothing",
+    ],
+    improveCta: "Make it compliant",
     editNote:
       "Every adjustment stays inside the limits of each document type.",
     editCta: "See the exports",
