@@ -44,6 +44,23 @@
   --color-accent-2-800: #3d472b;
   --color-accent-2-900: #272e1b;
 
+  /* ── Bảng "pop" — redesign tươi trẻ (đợt 1: Landing + Home) ──────────────
+     Nền sáng ấm + mực tím than + 5 màu kẹo, mỗi màu kèm một tint nhạt để làm
+     nền thẻ. Đặt CẠNH bảng cũ chứ không thay: các màn trong app đổi da đợt sau,
+     đè token cũ bây giờ là loang màu sang chỗ chưa làm. */
+  --color-pop-bg: #fffcf5;
+  --color-pop-ink: #241b40;
+  --color-viol: #6c4dff;
+  --color-viol-1: #efeaff;
+  --color-pink: #ff5390;
+  --color-pink-1: #ffe9f1;
+  --color-mint: #0fc98c;
+  --color-mint-1: #e0f9ef;
+  --color-sun: #ffc224;
+  --color-sun-1: #fff3d2;
+  --color-sky: #38b6ff;
+  --color-sky-1: #e3f4ff;
+
   --radius-sm: 8px;
   --radius-md: 16px;
   --radius-lg: 28px;
@@ -89,6 +106,20 @@
   --color-g700: var(--color-accent-2-700);
   --color-g800: var(--color-accent-2-800);
   --color-g900: var(--color-accent-2-900);
+
+  /* pop: tự-tham-chiếu như các dòng trên — tên utility = tên biến ở :root */
+  --color-pop-bg: var(--color-pop-bg);
+  --color-pop-ink: var(--color-pop-ink);
+  --color-viol: var(--color-viol);
+  --color-viol-1: var(--color-viol-1);
+  --color-pink: var(--color-pink);
+  --color-pink-1: var(--color-pink-1);
+  --color-mint: var(--color-mint);
+  --color-mint-1: var(--color-mint-1);
+  --color-sun: var(--color-sun);
+  --color-sun-1: var(--color-sun-1);
+  --color-sky: var(--color-sky);
+  --color-sky-1: var(--color-sky-1);
 
   --font-body: var(--font-figtree);
   --font-display: var(--font-baloo);
