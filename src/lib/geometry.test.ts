@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  FLAT_FILL_LIMIT,
+  NO_PAD,
   computeCrop,
   extendToFit,
+  needsBodyFill,
+  type CanvasPad,
+  type ExtendPlan,
   guideBands,
   resolutionCheck,
   type FaceLandmarks,
@@ -263,5 +268,176 @@ describe("spec registry", () => {
       expect(s.headRatio.target).toBeGreaterThanOrEqual(s.headRatio.min);
       expect(s.headRatio.target).toBeLessThanOrEqual(s.headRatio.max);
     }
+  });
+});
+
+describe("hai đầu dải: sai số làm tròn pixel không được thành lỗi", () => {
+  /**
+   * Bug thật, chụp được trên máy khách: kéo thanh trượt về sát đáy thì hiện dòng
+   * "Tỉ lệ đầu 62% nằm ngoài chuẩn 62–78%" — một câu tự mâu thuẫn.
+   *
+   * Nguyên nhân: `wantRatio` đã bị kẹp vào đúng 0.62, nhưng chiều cao khung phải
+   * là pixel nguyên nên `Math.round` làm nó cao thêm nửa pixel, và tỉ lệ đạt được
+   * tụt xuống 61.99%. Con số in ra làm tròn thành "62", còn phép so thì không.
+   */
+  const tight: FaceLandmarks = {
+    crownY: 0.2,
+    chinY: 0.65, // đầu = 0.45 × 1200 = 540px, đúng ca dựng lại được bug
+    eyeMidY: 0.44,
+    faceCenterX: 0.5,
+  };
+
+  it("kéo hết về đáy: đạt đúng biên, không sinh lỗi", () => {
+    const r = computeCrop(tight, 900, 1200, vn34, 0.885);
+    // Ở đây là chỗ bug sống: tỉ lệ thật tụt xuống dưới min một tí xíu…
+    expect(r.headRatio).toBeLessThan(vn34.headRatio.min);
+    // …nhưng lệch chưa tới một pixel, nên KHÔNG được coi là ngoài chuẩn.
+    expect((vn34.headRatio.min - r.headRatio) * r.crop.height).toBeLessThan(1);
+    expect(r.headOk).toBe(true);
+    expect(r.errors).toEqual([]);
+  });
+
+  it("kéo hết lên đỉnh cũng không sinh lỗi", () => {
+    const r = computeCrop(tight, 900, 1200, vn34, 1.15);
+    expect(r.headOk).toBe(true);
+    expect(r.errors.filter((e) => e.includes("Tỉ lệ đầu"))).toEqual([]);
+  });
+
+  it("lệch THẬT vẫn bị bắt — dung sai chỉ bằng một pixel, không nới tay", () => {
+    // Ảnh quá sát: khung bị thu lại cho vừa ảnh nên tỉ lệ đầu vọt lên hẳn.
+    const huge: FaceLandmarks = {
+      crownY: 0.02,
+      chinY: 0.92,
+      eyeMidY: 0.35,
+      faceCenterX: 0.5,
+    };
+    const r = computeCrop(huge, 900, 1200, vn34);
+    expect(r.headOk).toBe(false);
+    expect(r.errors.some((e) => e.includes("Tỉ lệ đầu"))).toBe(true);
+  });
+
+  it("dải hướng dẫn KHÔNG tự kết luận lại — lấy thẳng từ computeCrop", () => {
+    const r = computeCrop(tight, 900, 1200, vn34, 0.885);
+    const bands = guideBands(tight, vn34, r);
+    // Trước đây dải tự so `headRatio` với min/max nên nó đỏ trong khi không có
+    // dòng lỗi nào: hai nơi cùng kết luận một chuyện, và đã nói khác nhau.
+    expect(bands.crown.ok).toBe(r.headOk);
+    expect(bands.eye.ok).toBe(r.eyeOk);
+  });
+});
+
+describe("nới khung phải theo CỠ ĐẦU ĐANG CHỌN", () => {
+  /**
+   * Vì sao có test này: /api/retouch từng gọi `extendToFit` mà không truyền cỡ đầu,
+   * tức luôn dựng theo target. Người dùng kéo đầu nhỏ lại rồi bấm "Chuẩn hoá lại"
+   * thì nhận đúng phần nới cũ — phần thiếu bị lấp nền phẳng ở bước xuất và ra vai
+   * cụt ngang giữa nền.
+   */
+  // Ảnh chụp hơi gần — đúng kiểu ảnh khách tự chụp bằng điện thoại.
+  const near: FaceLandmarks = {
+    crownY: 0.1,
+    chinY: 0.7,
+    eyeMidY: 0.5,
+    faceCenterX: 0.5,
+  };
+
+  it("đầu nhỏ hơn ⇒ khung rộng hơn ⇒ phải nới NHIỀU hơn", () => {
+    const atTarget = extendToFit(near, 900, 1200, [vn34]);
+    const atMin = extendToFit(near, 900, 1200, [vn34], { vn34: 0.885 });
+    expect(atMin.growth).toBeGreaterThan(atTarget.growth);
+    expect(atMin.height).toBeGreaterThan(atTarget.height);
+  });
+
+  it("và có ca vượt HẲN sang bên kia ngưỡng nhờ model vẽ tiếp", () => {
+    // Đây là ca trong ảnh chụp màn hình: ở target thì lấp nền phẳng là vô hình nên
+    // không phiền model; kéo đầu xuống đáy thì phần thiếu đủ to để lộ vai cụt.
+    expect(extendToFit(near, 900, 1200, [vn34]).growth).toBeLessThan(
+      FLAT_FILL_LIMIT
+    );
+    expect(
+      extendToFit(near, 900, 1200, [vn34], { vn34: 0.885 }).growth
+    ).toBeGreaterThan(FLAT_FILL_LIMIT);
+  });
+
+  it("bỏ qua cỡ đầu = dựng đúng như target, tức bỏ sót phần người dùng vừa xin", () => {
+    // Đây chính là hành vi cũ. Giữ lại thành test để không ai lặng lẽ khôi phục nó.
+    expect(extendToFit(near, 900, 1200, [vn34], {})).toEqual(
+      extendToFit(near, 900, 1200, [vn34], { vn34: 1 })
+    );
+  });
+});
+
+describe("needsBodyFill — mép dưới không có 'nới ít thì vô hình'", () => {
+  /**
+   * Bug thật trên máy khách: khổ 4×6 (đường mắt 64% từ đáy) cần thêm ~7% thân
+   * dưới. 7% lọt dưới ngưỡng chung 8% nên hệ thống lấp nền phẳng — và đường cắt
+   * trắng đè ngang áo, ngay giữa ảnh thành phẩm. Ngưỡng 8% dựa trên giả định
+   * phần nới chỉ là NỀN: đúng cho trên/trái/phải, sai cho mép dưới.
+   */
+  const plan = (pad: Partial<CanvasPad>, imgW = 900, imgH = 1200): ExtendPlan => {
+    const p = { ...NO_PAD, ...pad };
+    const width = imgW + p.left + p.right;
+    const height = imgH + p.top + p.bottom;
+    return {
+      pad: p,
+      width,
+      height,
+      landmarks: lm,
+      needed: width !== imgW || height !== imgH,
+      growth: Math.max((width - imgW) / imgW, (height - imgH) / imgH),
+    };
+  };
+
+  it("thiếu đáy 7% — dưới ngưỡng chung — VẪN phải nhờ model", () => {
+    const p = plan({ bottom: 84 }); // 84/1200 = 7%
+    expect(p.growth).toBeLessThan(FLAT_FILL_LIMIT);
+    expect(needsBodyFill(p)).toBe(true);
+  });
+
+  it("thiếu TRÊN 7% thì lấp phẳng được — trên đầu là nền, không phải người", () => {
+    expect(needsBodyFill(plan({ top: 84 }))).toBe(false);
+  });
+
+  it("thiếu hai bên 7% cũng lấp phẳng được", () => {
+    expect(needsBodyFill(plan({ left: 32, right: 31 }))).toBe(false);
+  });
+
+  it("ngưỡng chung vẫn giữ: nới to ở bất kỳ mép nào là phải nhờ model", () => {
+    expect(needsBodyFill(plan({ top: 200 }))).toBe(true); // 16.7% > 8%
+  });
+
+  it("không nới gì thì thôi", () => {
+    expect(needsBodyFill(plan({}))).toBe(false);
+  });
+});
+
+describe("khung dựng theo HỢP các khổ cùng nền", () => {
+  /**
+   * Một nền = một lần gọi model, các loại thêm sau dùng CHUNG ảnh đó. Dựng khung
+   * chỉ theo loại chính thì khổ cao hơn thiếu thân dưới — và phần thiếu bị lấp
+   * phẳng lúc xuất. Hợp của các khổ phải phủ được từng khổ một.
+   */
+  const near: FaceLandmarks = {
+    crownY: 0.1,
+    chinY: 0.7,
+    eyeMidY: 0.5,
+    faceCenterX: 0.5,
+  };
+
+  it("pad hợp ≥ pad từng khổ, theo TỪNG mép", () => {
+    const both = extendToFit(near, 900, 1200, [vn34, getDoc("vn46")!]);
+    for (const spec of [vn34, getDoc("vn46")!]) {
+      const one = extendToFit(near, 900, 1200, [spec]);
+      expect(both.pad.top).toBeGreaterThanOrEqual(one.pad.top);
+      expect(both.pad.bottom).toBeGreaterThanOrEqual(one.pad.bottom);
+      expect(both.pad.left).toBeGreaterThanOrEqual(one.pad.left);
+      expect(both.pad.right).toBeGreaterThanOrEqual(one.pad.right);
+    }
+  });
+
+  it("ca thật: khung 3×4 đủ mà thêm 4×6 là phải nới đáy thêm", () => {
+    const only34 = extendToFit(near, 900, 1200, [vn34]);
+    const with46 = extendToFit(near, 900, 1200, [vn34, getDoc("vn46")!]);
+    expect(with46.pad.bottom).toBeGreaterThan(only34.pad.bottom);
   });
 });

@@ -151,3 +151,40 @@ export function newSessionId(): string {
 export function ownsKey(clientId: string, key: string): boolean {
   return key.startsWith(`${clientId}/`) && !key.includes("..");
 }
+
+/**
+ * Link này có được phép đi qua proxy tải hộ (/api/blob) không.
+ *
+ * Vì sao phải có proxy: nút "Tải tất cả (.zip)" gói ảnh bằng `fetch` từ browser,
+ * mà bucket R2 riêng tư không mở CORS — fetch chéo origin chết bằng đúng một câu
+ * "Failed to fetch" (đã xảy ra). Token S3 hiện tại không có quyền PutBucketCors
+ * (thử rồi: AccessDenied), nên server tải hộ là đường không phụ thuộc cấu hình
+ * bucket.
+ *
+ * Vì sao phải VALIDATE chứ không fetch bừa: route nhận nguyên một URL từ client
+ * — không khoá lại thì nó là máy SSRF công cộng. Ba chốt, thiếu một là từ chối:
+ *
+ * 1. Đúng host R2 của MÌNH — không bao giờ fetch host lạ.
+ * 2. Path nằm trong thư mục của CHÍNH khách đang gọi (cùng luật với `ownsKey`).
+ * 3. Link vẫn phải là presigned còn hạn — proxy không né chữ ký, chỉ né CORS.
+ */
+export function proxyAllowed(clientId: string, raw: string): boolean {
+  if (!client) return false;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.pathname.includes("..")) return false;
+
+  // SDK ký URL dạng VIRTUAL-HOSTED (bucket là subdomain) — đối chiếu bằng link
+  // thật, không phải giả định: bản đầu chỉ nhận path-style và chặn nhầm chính
+  // link mình vừa ký. Nhận cả hai dạng vì cùng một object.
+  const base = `${accountId}.r2.cloudflarestorage.com`;
+  return (
+    (url.host === `${bucket}.${base}` &&
+      url.pathname.startsWith(`/${clientId}/`)) ||
+    (url.host === base && url.pathname.startsWith(`/${bucket}/${clientId}/`))
+  );
+}

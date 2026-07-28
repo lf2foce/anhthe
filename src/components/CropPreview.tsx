@@ -85,6 +85,7 @@ export function CropPreview({
   backgroundHex,
   headScale = 1,
   brightness = 0,
+  sharpen = false,
   guides = false,
   labels,
   className = "",
@@ -98,6 +99,8 @@ export function CropPreview({
   backgroundHex: string;
   headScale?: number;
   brightness?: number;
+  /** Xem trước "Làm nét ảnh" — xấp xỉ phép tích chập của sharp, xem chú thích */
+  sharpen?: boolean;
   guides?: boolean;
   labels?: { crown: string; eye: string };
   className?: string;
@@ -122,24 +125,66 @@ export function CropPreview({
   return (
     <div
       className={`relative overflow-hidden ${className}`}
-      style={{
-        aspectRatio: `${spec.widthMm} / ${spec.heightMm}`,
-        background: backgroundHex,
-      }}
+      style={{ aspectRatio: `${spec.widthMm} / ${spec.heightMm}` }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={photo}
-        alt=""
-        className="absolute max-w-none"
+      {/*
+        Nền và ảnh nằm CHUNG một lớp, và độ sáng đặt trên lớp đó.
+        Đặt filter riêng trên <img> là sai: phần khung thò ra ngoài ảnh gốc (nền
+        nới thêm) không bị chỉnh sáng theo, nên kéo độ sáng là hiện ra một viền
+        sáng hơn quanh ảnh — trong khi file xuất ra KHÔNG có viền đó, vì sharp
+        `modulate` chạy sau `extract` nên nó ăn cả phần nới.
+        Dải hướng dẫn cố ý nằm NGOÀI lớp này: chúng là đồ hoạ chỉ dẫn, không phải
+        nội dung ảnh, chỉnh sáng chúng là bịa.
+      */}
+      {/*
+        Xem trước "Làm nét ảnh" bằng SVG feConvolveMatrix.
+        Bật toggle mà preview không đổi gì thì người dùng kết luận là nút hỏng
+        (đã xảy ra) — trong khi nét chỉ được áp lúc XUẤT bằng sharp. Đây là xấp
+        xỉ cùng họ (unsharp 3×3 nhẹ), không cam kết trùng từng pixel với sharp;
+        file cuối vẫn do MỘT công thức ở render.ts quyết định.
+        Filter đặt trong chính component để url(#…) luôn tìm thấy; trùng id giữa
+        nhiều preview vô hại vì các bản định nghĩa giống hệt nhau.
+      */}
+      {sharpen ? (
+        <svg width="0" height="0" className="absolute" aria-hidden>
+          <filter id="pv-sharpen">
+            <feConvolveMatrix
+              order="3"
+              kernelMatrix="0 -0.4 0 -0.4 2.6 -0.4 0 -0.4 0"
+              preserveAlpha="true"
+            />
+          </filter>
+        </svg>
+      ) : null}
+      <div
+        className="absolute inset-0"
         style={{
-          width: pct(imgW / crop.width),
-          height: pct(imgH / crop.height),
-          left: pct(-crop.left / crop.width),
-          top: pct(-crop.top / crop.height),
-          filter: brightness ? `brightness(${1 + brightness / 140})` : undefined,
+          background: backgroundHex,
+          // Thứ tự nét/sáng không thành vấn đề: nhân độ sáng và tích chập đều
+          // tuyến tính nên hoán vị được — sharp làm sáng trước nét, ở đây ngược
+          // lại vẫn ra cùng một ảnh.
+          filter:
+            [
+              sharpen ? "url(#pv-sharpen)" : "",
+              brightness ? `brightness(${1 + brightness / 140})` : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined,
         }}
-      />
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={photo}
+          alt=""
+          className="absolute max-w-none"
+          style={{
+            width: pct(imgW / crop.width),
+            height: pct(imgH / crop.height),
+            left: pct(-crop.left / crop.width),
+            top: pct(-crop.top / crop.height),
+          }}
+        />
+      </div>
 
       {guides && labels ? (
         <>

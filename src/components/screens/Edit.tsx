@@ -10,7 +10,7 @@ import {
   type BackgroundId,
   type DocSpec,
 } from "@/lib/docs";
-import { computeCrop, extendToFit } from "@/lib/geometry";
+import { computeCrop, extendToFit, needsBodyFill } from "@/lib/geometry";
 import type { Copy, Lang } from "@/lib/i18n";
 import type { Working } from "@/lib/studio";
 import { CropPreview } from "@/components/CropPreview";
@@ -29,14 +29,12 @@ export function Edit({
   failedBackgrounds,
   brightness,
   headScale,
-  smooth,
   sharpen,
   retouching,
   error,
   onBg,
   onBrightness,
   onHeadScale,
-  onSmooth,
   onSharpen,
   onRetouch,
   onRetryBg,
@@ -61,14 +59,12 @@ export function Edit({
   failedBackgrounds: BackgroundId[];
   brightness: number;
   headScale: number;
-  smooth: boolean;
   sharpen: boolean;
   retouching: boolean;
   error: string | null;
   onBg: (id: BackgroundId) => void;
   onBrightness: (v: number) => void;
   onHeadScale: (v: number) => void;
-  onSmooth: (v: boolean) => void;
   onSharpen: (v: boolean) => void;
   onRetouch: () => void;
   onRetryBg: () => void;
@@ -91,6 +87,22 @@ export function Edit({
    */
   const [peek, setPeek] = useState(false);
   const shown = peek && before ? before : working;
+  /**
+   * Ẩn/hiện kẻ chuẩn. Dải kẻ trả lời "đạt chưa" nhưng cũng che đúng vùng mắt và
+   * trán — chỗ người ta nhìn kỹ nhất khi duyệt ảnh của chính mình. Cho tắt tạm
+   * để ngắm ảnh trần; mặc định vẫn bật vì kẻ là công cụ canh, không phải trang trí.
+   */
+  const [showGuides, setShowGuides] = useState(true);
+
+  /**
+   * Cỡ đầu đang chọn có cần khung rộng hơn ảnh đang có không.
+   *
+   * Cỡ đầu và bề rộng khung tỉ lệ nghịch, nên kéo thanh trượt sau khi đã chuẩn hoá
+   * có thể đòi phần thân mà ảnh không có. Bước xuất sẽ lấp phẳng bằng màu nền —
+   * vai cụt ngang giữa nền. Cùng MỘT luật với server (needsBodyFill): thiếu đáy
+   * là giục ngay dù chỉ vài phần trăm, vì đáy là thân người chứ không phải nền.
+   */
+  const needsRefill = before !== null && needsBodyFill(plan);
 
   return (
     <div className="screen-in isolate flex h-full min-h-0 flex-col overflow-hidden bg-n900 lg:flex-row">
@@ -126,7 +138,10 @@ export function Edit({
             backgroundHex={bgHex(bg)}
             headScale={headScale}
             brightness={brightness}
-            guides
+            // Preview phải ĐỔI khi bật nét — nút bật mà ảnh y nguyên thì người
+            // dùng kết luận nút hỏng, dù file xuất có nét thật.
+            sharpen={sharpen}
+            guides={showGuides}
             labels={{ crown: t.crownLine, eye: t.eyeLine }}
             className="h-full w-full"
           />
@@ -139,6 +154,15 @@ export function Edit({
           className="absolute left-3.5 top-3.5 grid h-10 w-10 place-items-center rounded-full bg-n900/85 text-[17px] font-bold text-n100 shadow-[0_2px_10px_rgba(0,0,0,.45)] ring-[1.5px] ring-n100/45 backdrop-blur-sm"
         >
           ←
+        </button>
+
+        {/* Ẩn/hiện kẻ chuẩn — cùng ngôn ngữ hình với nút xem ảnh gốc bên dưới */}
+        <button
+          onClick={() => setShowGuides((v) => !v)}
+          aria-pressed={showGuides}
+          className="absolute right-3.5 top-3.5 rounded-full bg-n900/85 px-3.5 py-1.5 text-[11.5px] font-bold text-n100 shadow-[0_2px_10px_rgba(0,0,0,.45)] ring-1 ring-n100/30 backdrop-blur-sm"
+        >
+          {showGuides ? t.guidesHide : t.guidesShow}
         </button>
 
         {/* Giữ để xem ảnh gốc. Chạm/giữ chứ không phải bấm-đổi: so sánh kiểu
@@ -165,6 +189,19 @@ export function Edit({
             {lang === "vi" ? spec.vi : spec.en}
           </span>
           <span className="text-[10.5px] text-n600">{spec.dim}</span>
+        </div>
+
+        {/* BẬC 1 — việc BẮT BUỘC: đưa ảnh về đúng chuẩn loại giấy tờ (nền +
+            khung). Tách bậc rõ vì trộn với đồ làm đẹp thì trạng thái chuẩn hoá
+            — thứ quyết định file có nộp được không — nằm lọt giữa các toggle
+            tuỳ hứng, trông cùng hạng với "làm mịn da". */}
+        <div className="flex items-center gap-2">
+          <span className="grid h-[18px] w-[18px] flex-none place-items-center rounded-full bg-n900 text-[10px] font-bold text-n100">
+            1
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink">
+            {t.sectionFormat}
+          </span>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -232,53 +269,28 @@ export function Edit({
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="flex justify-between text-[12px] font-semibold">
-              <span>{t.bright}</span>
-              <span className="text-a700">
-                {brightness > 0 ? "+" : ""}
-                {brightness}
-              </span>
+        {/* Tỉ lệ đầu ở BẬC 1: nó là ràng buộc của chuẩn (có dải cho phép),
+            không phải làm đẹp. */}
+        <label className="flex flex-col gap-1.5">
+          <span className="flex justify-between text-[12px] font-semibold">
+            <span>{t.headRatio}</span>
+            <span className="text-a700">
+              {(fit.headRatio * 100).toFixed(0)}%
             </span>
-            <input
-              type="range"
-              min={-30}
-              max={30}
-              value={brightness}
-              onChange={(e) => onBrightness(Number(e.target.value))}
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="flex justify-between text-[12px] font-semibold">
-              <span>{t.headRatio}</span>
-              <span className="text-a700">
-                {(fit.headRatio * 100).toFixed(0)}%
-              </span>
-            </span>
-            <input
-              type="range"
-              min={85}
-              max={115}
-              value={Math.round(headScale * 100)}
-              onChange={(e) => onHeadScale(Number(e.target.value) / 100)}
-            />
-            <span className="text-[10.5px] text-n600">
-              {lang === "vi" ? "Giới hạn chuẩn " : "Allowed "}
-              {(spec.headRatio.min * 100).toFixed(0)}–
-              {(spec.headRatio.max * 100).toFixed(0)}%
-            </span>
-          </label>
-
-          <Toggle on={smooth} onChange={onSmooth} label={t.smooth} />
-          <Toggle
-            on={sharpen}
-            onChange={onSharpen}
-            label={t.sharpen}
-            sub={t.sharpenSub}
+          </span>
+          <input
+            type="range"
+            min={85}
+            max={115}
+            value={Math.round(headScale * 100)}
+            onChange={(e) => onHeadScale(Number(e.target.value) / 100)}
           />
-        </div>
+          <span className="text-[10.5px] text-n600">
+            {lang === "vi" ? "Giới hạn chuẩn " : "Allowed "}
+            {(spec.headRatio.min * 100).toFixed(0)}–
+            {(spec.headRatio.max * 100).toFixed(0)}%
+          </span>
+        </label>
 
         {error ? <ErrorNote>{error}</ErrorNote> : null}
 
@@ -308,21 +320,62 @@ export function Edit({
           // Xong rồi thì trạng thái phải NÓI RÕ và phải có đường làm lại. Bản cũ
           // chỉ có một dấu tích nhỏ lọt giữa danh sách: khách không ưng kết quả
           // là hết đường, phải chụp lại từ đầu.
-          <div className="flex items-center justify-between gap-2 rounded-2xl bg-g100 px-3.5 py-2.5">
-            <span className="flex items-center gap-2 text-[12px] font-bold text-g800">
-              <span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-g500 text-[11px] text-white">
-                ✓
+          <div
+            className={`flex flex-col gap-2 rounded-2xl px-3.5 py-2.5 ${
+              needsRefill ? "bg-a100" : "bg-g100"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className={`flex items-center gap-2 text-[12px] font-bold ${
+                  needsRefill ? "text-a700" : "text-g800"
+                }`}
+              >
+                <span
+                  className={`grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] text-white ${
+                    needsRefill ? "bg-accent" : "bg-g500"
+                  }`}
+                >
+                  {needsRefill ? "!" : "✓"}
+                </span>
+                {groups.length > 1
+                  ? `${t.bgDone} · ${groups.length} ${lang === "vi" ? "nền" : "backgrounds"}`
+                  : t.bgDone}
               </span>
-              {groups.length > 1
-                ? `${t.bgDone} · ${groups.length} ${lang === "vi" ? "nền" : "backgrounds"}`
-                : t.bgDone}
+              <button
+                onClick={onRedo}
+                className={`flex-none rounded-full px-3 py-1.5 text-[11.5px] font-bold ${
+                  needsRefill
+                    ? "bg-accent text-white"
+                    : "text-g800 shadow-[inset_0_0_0_1.5px_var(--color-accent-2-500)]"
+                }`}
+              >
+                {t.redo}
+              </button>
+            </div>
+            {/* Nối thanh trượt cỡ đầu với nút chạy lại: kéo cỡ xong mà không chạy
+                lại thì phần thân thiếu bị lấp phẳng, và chỗ đó chỉ lộ ra ở file
+                cuối. */}
+            {needsRefill ? (
+              <p className="m-0 text-[10.5px] leading-snug text-a700">
+                {t.needsRefill}
+              </p>
+            ) : null}
+          </div>
+        ) : working.backgroundOk !== undefined ? (
+          // Version hiện tại chưa sinh nhưng đang HIỂN THỊ version anh em (cùng
+          // nền, khác tuỳ chọn) — công chuẩn hoá vẫn còn đó. Hiện khối nhỏ "áp
+          // tuỳ chọn mới", KHÔNG quăng lại khối giới thiệu to như chưa làm gì:
+          // preview tụt về ảnh gốc + khối to đọc ra là "mất trắng" (phản hồi thật).
+          <div className="flex flex-col gap-2 rounded-2xl bg-a100 px-3.5 py-2.5">
+            <span className="text-[11.5px] font-semibold leading-snug text-a700">
+              {t.variantStale}
             </span>
-            <button
-              onClick={onRedo}
-              className="flex-none rounded-full px-3 py-1.5 text-[11.5px] font-bold text-g800 shadow-[inset_0_0_0_1.5px_var(--color-accent-2-500)]"
-            >
-              {t.redo}
-            </button>
+            <PrimaryButton onClick={onRetouch}>
+              {pendingCount > 1
+                ? `${t.variantApply} (${pendingCount}×)`
+                : t.variantApply}
+            </PrimaryButton>
           </div>
         ) : (
           // Đây là bước BẮT BUỘC của luồng, không phải tuỳ chọn phụ. Bản cũ để
@@ -344,6 +397,47 @@ export function Edit({
             </PrimaryButton>
           </div>
         )}
+
+        {/* BẬC 2 — làm đẹp TUỲ CHỌN. Mịn da đổi công thức AI nên bật/tắt có thể
+            đưa bậc 1 về "cần chạy version này"; nét và sáng là lớp tất định,
+            đổi thoải mái không tốn gì. */}
+        <div className="flex items-center gap-2 pt-1">
+          <span className="grid h-[18px] w-[18px] flex-none place-items-center rounded-full bg-n900 text-[10px] font-bold text-n100">
+            2
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink">
+            {t.sectionExtra}
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {/* KHÔNG có toggle mịn da ở luồng ảnh thẻ: mịn NHẸ là một phần của mẫu
+              chuẩn hoá chung (như tiệm ảnh — không ai hỏi khách chọn mức da).
+              Bậc 2 vì thế chỉ còn đồ TẤT ĐỊNH — đổi thoải mái, không tốn lượt,
+              không đẻ version. Muốn làm đẹp tuỳ ý là việc của Studio sáng tạo. */}
+          <Toggle
+            on={sharpen}
+            onChange={onSharpen}
+            label={t.sharpen}
+            sub={t.sharpenSub}
+          />
+          <label className="flex flex-col gap-1.5">
+            <span className="flex justify-between text-[12px] font-semibold">
+              <span>{t.bright}</span>
+              <span className="text-a700">
+                {brightness > 0 ? "+" : ""}
+                {brightness}
+              </span>
+            </span>
+            <input
+              type="range"
+              min={-30}
+              max={30}
+              value={brightness}
+              onChange={(e) => onBrightness(Number(e.target.value))}
+            />
+          </label>
+        </div>
 
         <p className="m-0 text-[11px] leading-snug text-g700">{t.editNote}</p>
 

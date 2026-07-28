@@ -42,6 +42,9 @@ export interface Copy {
   notRequired: string;
 
   editTitle: string;
+  /** Hai bậc của panel Chỉnh sửa: bắt buộc theo chuẩn vs làm đẹp tuỳ chọn */
+  sectionFormat: string;
+  sectionExtra: string;
   bgLabel: string;
   /** Giải thích vì sao có nền không bấm được */
   bgRule: string;
@@ -65,8 +68,16 @@ export interface Copy {
   bgNotApplied: string;
   bgRetry: string;
   redo: string;
+  /** Đang hiện version anh em vì version đúng tuỳ chọn chưa sinh */
+  variantStale: string;
+  variantApply: string;
+  /** Cỡ đầu hiện tại cần khung rộng hơn ảnh đã dựng — phải chạy lại mới lấp được */
+  needsRefill: string;
   peekHint: string;
   peekOn: string;
+  /** Ẩn/hiện dải kẻ chuẩn trên preview — kẻ che đúng vùng mắt/trán */
+  guidesHide: string;
+  guidesShow: string;
 
   exportTitle: string;
   exportSub: string;
@@ -78,6 +89,10 @@ export interface Copy {
   blockBgFailed: string;
   /** Loại mới tick đòi màu nền khác */
   needMoreBg: string;
+  /** Đầu nhóm nền ở màn Xuất: nhóm này đã có ảnh chuẩn hoá */
+  bgGroupReady: string;
+  /** Đầu nhóm nền ở màn Xuất: tick loại trong nhóm này là tốn thêm một lượt */
+  bgGroupExtra: string;
   lowRes: string;
   sheetTitle: string;
   sheetSub: string;
@@ -163,6 +178,8 @@ export const COPY: Record<Lang, Copy> = {
     notRequired: "· không bắt buộc cho lựa chọn này",
 
     editTitle: "Chỉnh sửa",
+    sectionFormat: "Căn đúng chuẩn giấy tờ",
+    sectionExtra: "Làm đẹp thêm (tuỳ chọn)",
     bgLabel: "Nền ảnh",
     bgRule:
       "Nền do chuẩn của từng loại giấy tờ quyết định. Bạn chỉ đổi được trong phạm vi loại đó cho phép.",
@@ -190,8 +207,15 @@ export const COPY: Record<Lang, Copy> = {
       "AI chưa đổi được nền — nền trong ảnh vẫn không đúng màu chuẩn. Thử lại, hoặc chụp trước một bức tường trơn.",
     bgRetry: "Thử thay nền lại",
     redo: "Chuẩn hoá lại",
+    variantStale:
+      "Ảnh đang hiện là bản trước đó — tuỳ chọn bạn vừa đổi chưa được áp.",
+    variantApply: "Áp tuỳ chọn mới",
+    needsRefill:
+      "Cỡ đầu này cần khung rộng hơn ảnh đang có. Chuẩn hoá lại để AI vẽ tiếp phần thân, nếu không phần thiếu sẽ bị lấp nền phẳng.",
     peekHint: "Giữ để xem ảnh gốc",
     peekOn: "Ảnh gốc",
+    guidesHide: "Ẩn kẻ chuẩn",
+    guidesShow: "Hiện kẻ chuẩn",
 
     exportTitle: "Xuất ảnh",
     exportSub:
@@ -204,6 +228,8 @@ export const COPY: Record<Lang, Copy> = {
       "Nền chưa đúng màu chuẩn. Thử chuẩn hoá lại trước khi xuất, nếu không ảnh sẽ bị từ chối ở quầy.",
     needMoreBg:
       "Loại vừa thêm cần màu nền khác — phải thay nền thêm một lần cho màu đó.",
+    bgGroupReady: "Đã chuẩn hoá",
+    bgGroupExtra: "Chọn thì thêm 1 lượt chuẩn hoá",
     lowRes: "Thiếu điểm ảnh — file sẽ bị phóng to và mềm nét",
     sheetTitle: "Bản in ghép 10×15 cm",
     sheetSub: "Xếp kín một tờ — mang ra tiệm in",
@@ -290,6 +316,8 @@ export const COPY: Record<Lang, Copy> = {
     notRequired: "· not required for this selection",
 
     editTitle: "Retouch",
+    sectionFormat: "Match the document format",
+    sectionExtra: "Optional touch-ups",
     bgLabel: "Background",
     bgRule:
       "Each document type dictates its background. You can only change it within what that type allows.",
@@ -317,8 +345,15 @@ export const COPY: Record<Lang, Copy> = {
       "The AI did not replace the background — it still is not the required colour. Try again, or shoot against a plain wall.",
     bgRetry: "Try replacing again",
     redo: "Run again",
+    variantStale:
+      "Showing the previous version — the option you just changed isn't applied yet.",
+    variantApply: "Apply new option",
+    needsRefill:
+      "This head size needs a wider frame than the current photo. Run again so the AI extends the body — otherwise the gap is filled with flat background.",
     peekHint: "Hold to see the original",
     peekOn: "Original",
+    guidesHide: "Hide guides",
+    guidesShow: "Show guides",
 
     exportTitle: "Export",
     exportSub:
@@ -331,6 +366,8 @@ export const COPY: Record<Lang, Copy> = {
       "The background is not the required colour yet. Run it again before exporting, or the photo will be rejected.",
     needMoreBg:
       "The type you just added needs a different background — one more replacement pass for that colour.",
+    bgGroupReady: "Normalized",
+    bgGroupExtra: "Picking one adds a normalization run",
     lowRes: "Not enough pixels — this file will be upscaled and look soft",
     sheetTitle: "Print sheet 10×15 cm",
     sheetSub: "A full sheet — print it at any shop",

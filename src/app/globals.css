@@ -96,6 +96,18 @@
   --radius-organic: 28px;
 }
 
+/*
+ * TOÀN BỘ style nền của app phải nằm TRONG `@layer base`.
+ *
+ * CSS không thuộc layer nào thắng MỌI CSS có layer, bất kể thứ tự và specificity —
+ * mà utility của Tailwind v4 nằm trong `@layer utilities`. Khối reset `button`
+ * dưới đây từng đứng ngoài layer, thế là `background:none; color:inherit` của nó
+ * đè chết `bg-*`/`text-*` trên MỌI nút của app: nút chính "Xem bản xuất" hiện ra
+ * như một dòng chữ trần. Bug sống lâu được vì các nút còn lại đều tình cờ dựa vào
+ * shadow/ring — thứ reset không đụng tới.
+ */
+@layer base {
+
 * {
   box-sizing: border-box;
 }
@@ -217,3 +229,5 @@ input[type="range"]::-moz-range-thumb {
 .screen-in {
   animation: fadeUp 0.22s ease both;
 }
+
+} /* hết @layer base */

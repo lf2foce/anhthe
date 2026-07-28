@@ -38,6 +38,15 @@ export interface CropResult {
   eyeFromBottom: number;
   /** Chiều cao đầu tính bằng pixel ảnh nguồn — KHÔNG đổi khi nới khung */
   headPx: number;
+  /**
+   * Đạt chuẩn chưa, đã trừ sai số làm tròn pixel.
+   *
+   * Ở ĐÂY, không phải ở chỗ vẽ: dải hướng dẫn từng tự so lại `headRatio` với
+   * min/max của spec, nên hai nơi có thể kết luận khác nhau — dải đỏ mà không có
+   * dòng lỗi nào, hoặc ngược lại.
+   */
+  headOk: boolean;
+  eyeOk: boolean;
   /** Lý do ảnh KHÔNG dùng được cho spec này (crop tràn khỏi ảnh gốc…) */
   errors: string[];
 }
@@ -67,6 +76,8 @@ export function computeCrop(
       headRatio: 0,
       eyeFromBottom: 0,
       headPx: 0,
+      headOk: false,
+      eyeOk: false,
       errors: ["Không đo được chiều cao đầu (landmark không hợp lệ)."],
     };
   }
@@ -108,17 +119,36 @@ export function computeCrop(
   const achievedHead = headPx / crop.height;
   const achievedEye = (crop.top + crop.height - eyePx) / crop.height;
 
-  if (achievedHead < spec.headRatio.min || achievedHead > spec.headRatio.max) {
+  /*
+   * Dung sai MỘT PIXEL khi so với chuẩn.
+   *
+   * Khung phải là pixel nguyên nên `Math.round` đẩy tỉ lệ đạt được lệch khỏi tỉ lệ
+   * mong muốn một chút. `wantRatio` đã bị kẹp vào [min, max] rồi, nên ở đúng hai
+   * đầu dải cái lệch đó là thứ DUY NHẤT đẩy nó ra ngoài — và sinh ra câu vô nghĩa
+   * "Tỉ lệ đầu 62% nằm ngoài chuẩn 62–78%" (đã thấy trên máy khách).
+   *
+   * Một pixel chiều cao khung đổi tỉ lệ đầu đi `achieved / height`, và đổi đường
+   * mắt đi `1 / height`. Nới đúng bằng đó, không hơn: nới rộng tay là bịt luôn cả
+   * lỗi thật.
+   */
+  const headTol = achievedHead / crop.height;
+  const eyeTol = 1 / crop.height;
+
+  const headOk =
+    achievedHead >= spec.headRatio.min - headTol &&
+    achievedHead <= spec.headRatio.max + headTol;
+  const eyeOk =
+    achievedEye >= spec.eyeFromBottom.min - eyeTol &&
+    achievedEye <= spec.eyeFromBottom.max + eyeTol;
+
+  if (!headOk) {
     errors.push(
       `Tỉ lệ đầu ${(achievedHead * 100).toFixed(0)}% nằm ngoài chuẩn ${(
         spec.headRatio.min * 100
       ).toFixed(0)}–${(spec.headRatio.max * 100).toFixed(0)}%.`
     );
   }
-  if (
-    achievedEye < spec.eyeFromBottom.min ||
-    achievedEye > spec.eyeFromBottom.max
-  ) {
+  if (!eyeOk) {
     errors.push(
       `Đường mắt ${(achievedEye * 100).toFixed(
         0
@@ -133,6 +163,8 @@ export function computeCrop(
     headRatio: achievedHead,
     eyeFromBottom: achievedEye,
     headPx,
+    headOk,
+    eyeOk,
     errors,
   };
 }
@@ -168,17 +200,15 @@ export function guideBands(
       from: 1 - spec.eyeFromBottom.max,
       to: 1 - spec.eyeFromBottom.min,
       at: eyeAt,
-      ok:
-        fit.eyeFromBottom >= spec.eyeFromBottom.min &&
-        fit.eyeFromBottom <= spec.eyeFromBottom.max,
+      // Đạt/không đạt lấy THẲNG từ `fit`, không so lại: so lại là hai nơi cùng
+      // kết luận một chuyện và sẽ có ngày nói khác nhau.
+      ok: fit.eyeOk,
     },
     crown: {
       from: eyeAt - spec.headRatio.max * eyeInHead,
       to: eyeAt - spec.headRatio.min * eyeInHead,
       at: eyeAt - fit.headRatio * eyeInHead,
-      ok:
-        fit.headRatio >= spec.headRatio.min &&
-        fit.headRatio <= spec.headRatio.max,
+      ok: fit.headOk,
     },
   };
 }
@@ -297,8 +327,36 @@ export function extendToFit(
  *
  * Dưới ngưỡng: dải thêm vào chỉ là nền, mắt không thấy. Trên ngưỡng: phần thêm
  * đủ rộng để lộ ra vai bị cắt cụt giữa nền phẳng — lúc đó phải nhờ model vẽ tiếp.
+ *
+ * CHỈ áp cho trên/trái/phải. Mép DƯỚI có luật riêng — xem `needsBodyFill`.
  */
 export const FLAT_FILL_LIMIT = 0.08;
+
+/**
+ * Mép DƯỚI: chỉ cần thò ra hơn 1% là phải nhờ model, không có "nới ít thì vô hình".
+ *
+ * Ngưỡng 8% dựa trên giả định phần nới chỉ là NỀN — đúng cho ba mép kia, sai cho
+ * mép dưới: dưới ảnh là ngực và vai, lấp phẳng bao nhiêu là cắt cụt thân bấy
+ * nhiêu, và đường cắt nằm ngay giữa ảnh thành phẩm. Đã thấy trên máy khách: khổ
+ * 4×6 (đường mắt 64% từ đáy, cần nhiều thân dưới) hiện nguyên một dải trắng đè
+ * lên áo — pad đáy 7% lọt dưới ngưỡng chung nên hệ thống cho qua.
+ */
+export const BODY_FILL_LIMIT = 0.01;
+
+/**
+ * Kế hoạch nới này có bắt buộc model vẽ tiếp thân người không.
+ *
+ * Đây là MỘT nguồn sự thật cho cả ba nơi cùng hỏi câu này: /api/retouch (quyết
+ * có bảo model vẽ không), màn Chỉnh sửa (quyết có giục chuẩn hoá lại không).
+ * Mỗi nơi tự so một kiểu là có ngày ba nơi nói ba chuyện.
+ */
+export function needsBodyFill(plan: ExtendPlan): boolean {
+  const srcH = plan.height - plan.pad.top - plan.pad.bottom;
+  return (
+    plan.growth > FLAT_FILL_LIMIT ||
+    (srcH > 0 && plan.pad.bottom / srcH > BODY_FILL_LIMIT)
+  );
+}
 
 /** Nới quá mức này thì ảnh gốc thật sự không dùng được, đừng bắt model đoán */
 export const EXTEND_LIMIT = 0.8;

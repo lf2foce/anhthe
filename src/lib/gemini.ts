@@ -389,6 +389,11 @@ async function generateImage(opts: {
   /** Màu lấp phần trong suốt khi model trả PNG có alpha */
   flattenTo: string;
 }): Promise<RetouchResult> {
+  // Bản lite KHÔNG nhận imageSize — gửi kèm là 400 "Image size 2K is not
+  // supported" (đo thật 28/07/2026). Đặt GEMINI_IMAGE_SIZE mà quên đổi model
+  // là chết cả route thay nền, nên bỏ tham số ở đây thay vì bắt env phải nhớ.
+  const imageSize = opts.model.includes("lite") ? undefined : opts.imageSize;
+
   const res = await getClient().models.generateContent({
     model: opts.model,
     contents: [
@@ -408,7 +413,7 @@ async function generateImage(opts: {
     config: {
       imageConfig: {
         aspectRatio: opts.aspectRatio,
-        ...(opts.imageSize ? { imageSize: opts.imageSize } : {}),
+        ...(imageSize ? { imageSize } : {}),
       },
     },
   });

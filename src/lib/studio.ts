@@ -72,14 +72,28 @@ export interface StudioState {
    * âm thầm đổi cả những loại người dùng không xem tới.
    */
   headScales: Record<string, number>;
+  /**
+   * Mịn da NHẸ trong lệnh chuẩn hoá. Luồng ảnh thẻ KHÔNG còn toggle cho nó —
+   * mịn nhẹ là một phần của mẫu chuẩn chung (như tiệm ảnh, không ai hỏi khách
+   * chọn mức da), nên giá trị này đứng yên ở true. Giữ trong state + variantKey
+   * vì nó vẫn là tham số THẬT của lệnh model — nguồn sự thật của version.
+   */
   smooth: boolean;
   /**
    * Làm nét khi xuất file. Tích chập thuần, không gọi model — nên đổi cờ này KHÔNG
    * làm mất bản đã thay nền.
    */
   sharpen: boolean;
-  /** Một bản đã thay nền cho MỖI màu nền cần dùng trong phiên */
-  retouched: Partial<Record<BackgroundId, Working>>;
+  /**
+   * Cache VERSION: mỗi bộ tuỳ chọn AI = một bản ảnh riêng, key từ `variantKey`.
+   *
+   * Model không tất định — chạy lại cùng yêu cầu KHÔNG ra cùng ảnh — nên đây
+   * không phải tối ưu tiết kiệm lượt mà là thứ duy nhất làm cho toggle ổn định:
+   * tắt "Làm mịn da" rồi bật lại phải trả về ĐÚNG bản đã ưng, không phải một bản
+   * mới hên xui. Bản cũ không bao giờ bị xoá vì đổi tuỳ chọn; chỉ ảnh gốc mới
+   * (chụp lại) mới làm cache vô nghĩa.
+   */
+  retouched: Partial<Record<string, Working>>;
   retouching: boolean;
 
   sheet: boolean;
@@ -121,6 +135,46 @@ export function headScaleOf(s: StudioState, docId: string): number {
 }
 
 /**
+ * Key version cho một nền theo TUỲ CHỌN ĐANG BẬT.
+ *
+ * Chỉ những tham số THẬT SỰ đổi lệnh gửi model mới được vào key — thêm thứ không
+ * đổi ảnh (sharpen chạy lúc xuất, brightness là CSS/sharp) là tự làm cache trượt
+ * vô ích. `evenLighting` cũng không vào key: nó suy từ kết quả kiểm tra của TẤM
+ * ẢNH, mà đổi ảnh thì cache đã bị xoá toàn bộ ở runCheck rồi — trong đời một
+ * cache, nó là hằng số.
+ */
+export function variantKey(s: StudioState, bg: BackgroundId): string {
+  return `${bg}/${s.smooth ? "smooth" : "plain"}`;
+}
+
+/** Bản đã chuẩn hoá của nền này Ở BỘ TUỲ CHỌN HIỆN TẠI — thiếu nghĩa là chưa sinh */
+export function variantOf(
+  s: StudioState,
+  bg: BackgroundId
+): Working | undefined {
+  return s.retouched[variantKey(s, bg)];
+}
+
+/**
+ * Bản GẦN NHẤT để HIỂN THỊ: đúng version, không có thì version anh em (cùng
+ * nền, khác mỗi tuỳ chọn mịn).
+ *
+ * Chỉ dành cho preview. Bật mịn da khi bản-có-mịn chưa sinh mà preview rơi
+ * thẳng về ảnh gốc nền phòng khách thì đọc ra là "mất trắng công chuẩn hoá" —
+ * trong khi bản không-mịn vẫn nằm trong cache và khác bản đích đúng một lớp da.
+ * Mọi kết luận (pending, verified, block, payload xuất) vẫn đi qua `variantOf`
+ * nghiêm ngặt — hiển thị được phép gần đúng, cam kết thì không.
+ */
+export function nearestWorking(
+  s: StudioState,
+  bg: BackgroundId
+): Working | undefined {
+  return (
+    variantOf(s, bg) ?? s.retouched[`${bg}/${s.smooth ? "plain" : "smooth"}`]
+  );
+}
+
+/**
  * Chế độ đang chạy = họ của loại chính. KHÔNG lưu riêng: hai nguồn sự thật cho cùng
  * một thứ là chỗ sinh trạng thái vô nghĩa (chế độ "giấy tờ" mà loại chính là LinkedIn).
  */
@@ -145,14 +199,17 @@ export function originalWorking(s: StudioState): Working | null {
 }
 
 /**
- * Ảnh dùng cho crop/xuất MỘT loại giấy tờ: ưu tiên bản đã thay nền đúng màu của
- * loại đó, vì landmark bản đó đã được đo lại trên chính nó.
+ * Ảnh để HIỂN THỊ cho một loại giấy tờ: đúng version → version anh em → ảnh gốc.
+ *
+ * Đây là hàm của preview, không phải của cam kết: payload xuất thật nằm ở
+ * `exportGroups` (nghiêm ngặt theo version), và nút Xuất bị `exportBlock` khoá
+ * tới khi đúng version tồn tại — nên hiển thị gần đúng không giao nhầm file.
  */
 export function workingFor(s: StudioState, docId: string): Working | null {
   const original = originalWorking(s);
   const spec = getDoc(docId);
   if (!spec) return original;
-  return s.retouched[resolveBackground(spec, s.bgPref)] ?? original;
+  return nearestWorking(s, resolveBackground(spec, s.bgPref)) ?? original;
 }
 
 /** Nhóm nền cần cho tập giấy tờ đang chọn — mỗi nhóm là một lần gọi model */
@@ -160,9 +217,15 @@ export function retouchGroups(s: StudioState): BackgroundGroup[] {
   return groupByBackground(s.picked, s.bgPref);
 }
 
-/** Nhóm chưa có bản thay nền — đúng số lần còn phải gọi model */
+/**
+ * Nhóm chưa có bản thay nền Ở VERSION HIỆN TẠI — đúng số lần còn phải gọi model.
+ *
+ * "Pending" là thuộc tính của VERSION chứ không phải của nền: tắt "Làm mịn da"
+ * khi mới chỉ sinh bản có mịn là nhóm đó pending trở lại — bản kia vẫn nằm trong
+ * cache, bật lại là về ngay không tốn lượt.
+ */
 export function pendingGroups(s: StudioState): BackgroundGroup[] {
-  return retouchGroups(s).filter((g) => !s.retouched[g.background]);
+  return retouchGroups(s).filter((g) => !variantOf(s, g.background));
 }
 
 /**
@@ -174,7 +237,7 @@ export function pendingGroups(s: StudioState): BackgroundGroup[] {
  */
 export function failedBackgrounds(s: StudioState): BackgroundId[] {
   return retouchGroups(s)
-    .filter((g) => s.retouched[g.background]?.backgroundOk === false)
+    .filter((g) => variantOf(s, g.background)?.backgroundOk === false)
     .map((g) => g.background);
 }
 
@@ -198,7 +261,7 @@ export function compliance(s: StudioState): Compliance | null {
 export function retouchVerified(s: StudioState): boolean {
   const groups = retouchGroups(s);
   if (groups.length === 0) return false;
-  return groups.every((g) => s.retouched[g.background]?.backgroundOk === true);
+  return groups.every((g) => variantOf(s, g.background)?.backgroundOk === true);
 }
 
 /**
@@ -222,7 +285,7 @@ export function exportGroups(s: StudioState): ExportGroup[] {
   const original = originalWorking(s);
   if (!original) return [];
   return retouchGroups(s).map((g) => {
-    const working = s.retouched[g.background] ?? original;
+    const working = variantOf(s, g.background) ?? original;
     return {
       photo: working.photo,
       landmarks: working.landmarks,

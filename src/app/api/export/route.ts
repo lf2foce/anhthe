@@ -16,7 +16,12 @@ import {
   type BackgroundId,
   type DocSpec,
 } from "@/lib/docs";
-import { computeCrop, extendToFit, type FaceLandmarks } from "@/lib/geometry";
+import {
+  computeCrop,
+  extendToFit,
+  needsBodyFill,
+  type FaceLandmarks,
+} from "@/lib/geometry";
 import { decodeDataUrl } from "@/lib/imageio";
 import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
 import { checkSize, remainingFor, withClientCookie } from "@/lib/gate";
@@ -202,6 +207,26 @@ export async function POST(request: Request) {
       const scales = Object.fromEntries(
         group.specs.map((spec) => [spec.id, headScaleOf(spec.id)])
       );
+
+      /*
+       * Khổ nào phải lấp phẳng phần THÂN DƯỚI thì nói thẳng trên file đó.
+       *
+       * Xuất không được gọi model (tất định, không tốn lượt), nên gặp ảnh thiếu
+       * đáy nó chỉ có một cách là lấp nền phẳng — tức vết cắt ngang áo. Ca này
+       * xảy ra khi tick thêm khổ cao hơn SAU khi đã chuẩn hoá (cùng nền nên
+       * không có lượt chạy mới). Im lặng là giao file hỏng; đo trước, cảnh báo
+       * theo từng khổ.
+       */
+      const bodyCut = new Set(
+        group.specs
+          .filter((spec) =>
+            needsBodyFill(
+              extendToFit(landmarks, width, height, [spec], scales)
+            )
+          )
+          .map((spec) => spec.id)
+      );
+
       const plan = extendToFit(landmarks, width, height, group.specs, scales);
       if (plan.needed) {
         const srcDeviation = await backgroundDeviation(buffer, group.hex, {
@@ -234,6 +259,11 @@ export async function POST(request: Request) {
         });
 
         const warnings = [...errors];
+        if (bodyCut.has(spec.id)) {
+          warnings.push(
+            "Khổ này cần thêm phần thân dưới mà ảnh chuẩn hoá chưa có — phần thiếu đang lấp nền phẳng. Quay lại bước Chỉnh sửa bấm 'Chuẩn hoá lại' để AI vẽ tiếp thân cho đủ mọi khổ đã chọn."
+          );
+        }
         // Đường cằm trong ẢNH ĐÃ CẮT, không phải trong ảnh gốc — vùng đo nền phải
         // theo hệ toạ độ của file thành phẩm.
         const chinFraction =

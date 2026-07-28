@@ -26,6 +26,20 @@ export function Done({
 }) {
   const lockedCount = files.filter((f) => !f.img.unlocked).length;
 
+  /**
+   * Đường TẢI đi qua proxy cùng origin, đường XEM (<img>) thì không.
+   *
+   * `fetch` chéo origin sang bucket R2 riêng tư (không CORS) chết bằng câu
+   * "Failed to fetch" — <img> thì hiển thị bình thường vì không cần CORS, nên
+   * bug chỉ nổ đúng lúc bấm tải zip. Qua proxy cũng đặt được tên file (link
+   * chéo origin bị browser lờ thuộc tính download). Chế độ chưa có R2 trả data
+   * URL — cùng origin sẵn, giữ nguyên.
+   */
+  const downloadPath = (f: ExportedFile) =>
+    f.img.url.startsWith("http")
+      ? `/api/blob?u=${encodeURIComponent(f.img.url)}&name=${encodeURIComponent(f.name)}`
+      : f.img.url;
+
   /** Ảnh nào xin link sạch không được thì giữ nguyên bản xem thử */
   async function unlockAll() {
     if (!sessionId) return;
@@ -56,7 +70,7 @@ export function Done({
       const zip = new JSZip();
       // Tải hết về TRƯỚC rồi mới gói: lỗi mạng giữa chừng mà đưa Promise thẳng
       // cho jszip thì ra file zip thiếu ảnh mà không ai biết.
-      const blobs = await Promise.all(files.map((f) => fetchBlob(f.img.url)));
+      const blobs = await Promise.all(files.map((f) => fetchBlob(downloadPath(f))));
       blobs.forEach((b, i) => zip.file(files[i].name, b));
       const blob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(blob);
@@ -111,7 +125,7 @@ export function Done({
               ) : null}
             </div>
             <button
-              onClick={() => downloadUrl(f.img.url, f.name)}
+              onClick={() => downloadUrl(downloadPath(f), f.name)}
               className="rounded-full px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider text-g200 shadow-[inset_0_0_0_1.5px_rgba(240,250,225,.45)]"
             >
               {t.downloadOne}

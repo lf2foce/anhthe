@@ -5,6 +5,7 @@ import Link from "next/link";
 import { checkPhoto, exportFiles, fetchQuota, retouchPhoto } from "@/lib/api";
 import { fileToPhoto } from "@/lib/capture";
 import {
+  BACKGROUNDS,
   allowedBackgrounds,
   docsOf,
   familyOf,
@@ -25,6 +26,8 @@ import {
   originalWorking,
   pendingGroups,
   retouchGroups,
+  variantKey,
+  variantOf,
   workingFor,
   type Screen,
   type StudioState,
@@ -152,30 +155,42 @@ export function Studio({
    */
   async function runRetouch(targets: typeof groups) {
     if (!s.photo || targets.length === 0) return;
-    // Đổi "Làm mịn da" giữa chừng sẽ xoá `retouched`, nhưng vòng lặp đang bay vẫn
-    // ghi đè bằng bản chụp state CŨ — tích xanh hiện cho ảnh sai. Đánh dấu đời của
-    // lượt, kết quả thuộc lượt quá khứ thì bỏ. (CreativeStudio đã có guard này,
-    // luồng ảnh thẻ thì chưa.)
+    // Đánh dấu đời của lượt để nút "Chuẩn hoá lại" bấm dồn không sinh hai vòng
+    // cùng ghi. Kết quả về muộn của đời cũ vẫn ĐƯỢC ghi vào cache (nó đúng cho
+    // version nó được sinh ra — key nói hộ), chỉ cờ retouching là của đời mới.
     const myRun = ++retouchRun.current;
     patch({ retouching: true, error: null });
 
     const evenLighting =
       s.check?.checks.some((c) => c.id === "lighting_even" && !c.pass) ?? false;
-    const done: Partial<Record<BackgroundId, Working>> = { ...s.retouched };
 
     try {
       for (const group of targets) {
-        done[group.background] = await retouchPhoto({
+        // Key chốt từ tham số THẬT gửi đi (bản chụp state lúc bấm) — người dùng
+        // đổi toggle giữa chừng thì kết quả này vẫn nằm đúng ngăn của nó.
+        const key = variantKey(s, group.background);
+        const result = await retouchPhoto({
           photo: s.photo,
           docId: s.primary,
+          // Mọi loại trong nhóm nền này — khung phải chứa được KHỔ CAO NHẤT,
+          // không thì loại thêm sau bị lấp phẳng phần thân lúc xuất.
+          docIds: group.docIds,
           landmarks: s.check!.landmarks,
+          // Cỡ đầu quyết định khung rộng bao nhiêu, tức phải vẽ thêm bao nhiêu
+          // thân. Không gửi thì server dựng theo target và "Chuẩn hoá lại" sau khi
+          // kéo cỡ chẳng thay đổi được gì.
+          headScale: headScaleOf(s, s.primary),
           background: group.background,
           smooth: s.smooth,
           evenLighting,
         });
+        // GHÉP vào cache đang có, không thay cả cụm: thay cả cụm bằng bản chụp
+        // cũ là xoá câm những version các vòng khác vừa ghi.
+        setS((prev) => ({
+          ...prev,
+          retouched: { ...prev.retouched, [key]: result },
+        }));
         if (retouchRun.current !== myRun) return;
-        // Ghi từng nhóm xong ngay: nhóm sau lỗi thì nhóm trước vẫn dùng được.
-        setS((prev) => ({ ...prev, retouched: { ...done } }));
       }
       if (retouchRun.current === myRun) patch({ retouching: false, files: null });
     } catch (e) {
@@ -214,17 +229,12 @@ export function Studio({
   }
 
   /**
-   * Đổi nền không xoá bản đã sửa: bản nền trắng vẫn đúng cho mọi loại đòi nền
-   * trắng. Chỉ danh sách nhóm là thay đổi. Đổi mức làm mịn thì khác — bản cũ sinh
-   * ra bằng tham số khác nên phải bỏ hết.
+   * Đổi nền không xoá gì — mỗi nền là một VERSION riêng trong cache, đổi qua
+   * lại giữa các nền đã sinh là tức thì. (Luồng ảnh thẻ không còn tuỳ chọn AI
+   * nào khác: mịn nhẹ nằm cứng trong mẫu chuẩn hoá chung — s.smooth luôn true.)
    */
   function setBgPref(bgPref: BackgroundId) {
     patch({ bgPref, files: null });
-  }
-  function setSmooth(smooth: boolean) {
-    // Tăng đời để mọi kết quả đang bay bị bỏ — chúng sinh ra với tham số cũ.
-    retouchRun.current++;
-    patch({ smooth, retouched: {}, retouching: false, files: null });
   }
 
   function reset() {
@@ -413,7 +423,6 @@ export function Studio({
               failedBackgrounds={failed}
               brightness={s.brightness}
               headScale={headScaleOf(s, editSpec.id)}
-              smooth={s.smooth}
               sharpen={s.sharpen}
               retouching={s.retouching}
               error={s.error}
@@ -427,7 +436,6 @@ export function Studio({
                   files: null,
                 })
               }
-              onSmooth={setSmooth}
               // Làm nét chạy lúc xuất file, không phải lúc thay nền — nên chỉ cần
               // bỏ `files` đã dựng, giữ nguyên bản đã thay nền.
               onSharpen={(sharpen) => patch({ sharpen, files: null })}
@@ -435,11 +443,11 @@ export function Studio({
               onRetryBg={() =>
                 runRetouch(groups.filter((g) => failed.includes(g.background)))
               }
-              // Chạy lại TẤT CẢ các nhóm: xoá bản cũ trước để `pendingGroups`
-              // tính ra đủ, nếu không nó thấy nhóm nào cũng xong rồi và không chạy.
+              // Chạy lại = GHI ĐÈ version hiện tại của mọi nhóm. Không xoá gì:
+              // runRetouch nhận targets tường minh nên không cần lừa pendingGroups,
+              // và các version khác trong cache phải sống sót qua lần chạy này.
               onRedo={() => {
-                retouchRun.current++;
-                setS((prev) => ({ ...prev, retouched: {}, files: null }));
+                patch({ files: null });
                 runRetouch(groups);
               }}
               onBack={() => patch({ screen: "check", error: null })}
@@ -459,6 +467,12 @@ export function Studio({
               picked={s.picked}
               onToggle={toggleDoc}
               compliance={fit}
+              // "Sẵn sàng" là theo VERSION hiện tại — nền có bản mịn mà đang
+              // tắt mịn thì vẫn tính là chưa sẵn. Quét MỌI nền chứ không chỉ
+              // nhóm đang chọn: nền từng sinh rồi thì tick loại dùng nó là miễn phí.
+              readyBackgrounds={BACKGROUNDS.map((b) => b.id).filter(
+                (bg) => !!variantOf(s, bg)
+              )}
               pendingCount={pending.length}
               block={exportBlock(s)}
               retouching={s.retouching}

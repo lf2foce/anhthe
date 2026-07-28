@@ -27,8 +27,8 @@ import {
 } from "@/lib/render";
 import {
   EXTEND_LIMIT,
-  FLAT_FILL_LIMIT,
   extendToFit,
+  needsBodyFill,
   type FaceLandmarks,
 } from "@/lib/geometry";
 import { sharpExtend } from "@/lib/render";
@@ -67,6 +67,10 @@ export async function POST(request: Request) {
     docId?: string;
     /** Landmark đo ở bước kiểm tra — cần để biết phải nới khung bao nhiêu */
     landmarks?: FaceLandmarks;
+    /** Cỡ đầu đang chọn (1 = target). Quyết định khung rộng bao nhiêu. */
+    headScale?: number;
+    /** Mọi loại dùng chung nền này — khung dựng theo HỢP của các khổ */
+    docIds?: string[];
     background?: BackgroundId;
     smooth?: boolean;
     evenLighting?: boolean;
@@ -131,13 +135,55 @@ export async function POST(request: Request) {
     let fillMargins = false;
 
     if (body.landmarks) {
-      const plan = extendToFit(
-        body.landmarks,
-        src.width,
-        src.height,
-        [spec]
+      /*
+       * Nới theo CỠ ĐẦU ĐANG CHỌN, không theo target của spec.
+       *
+       * Khung rộng bao nhiêu tỉ lệ nghịch với cỡ đầu: kéo đầu từ 70% xuống 62% là
+       * khung rộng thêm 13%, tức cần vẽ thêm chừng đó thân. Bản trước bỏ qua tham
+       * số này nên luôn dựng theo target — người kéo nhỏ đầu rồi bấm chuẩn hoá lại
+       * vẫn nhận đúng phần nới cũ, và phần thiếu bị lấp phẳng ở bước xuất: vai cụt
+       * ngang giữa nền.
+       *
+       * Kẹp cùng dải với thanh trượt và với /api/export — ba nơi phải cùng một khung.
+       */
+      const headScale = Math.min(
+        1.15,
+        Math.max(0.85, Number(body.headScale) || 1)
       );
-      if (plan.growth > EXTEND_LIMIT) {
+
+      /*
+       * Khung dựng theo HỢP của MỌI khổ dùng chung nền này, không riêng loại chính.
+       *
+       * Một nền = một lần gọi model; các loại thêm sau lấy CHUNG ảnh này. Dựng
+       * riêng cho loại chính thì khổ cao hơn (4×6 cạnh 3×4) thiếu thân dưới, và
+       * phần thiếu bị lấp phẳng lúc xuất — không phải lỗi của riêng khổ nào, lỗi
+       * ở chỗ dựng khung không nhìn hết danh sách.
+       *
+       * Registry quyết loại nào được vào hợp: cùng họ và cho phép nền này. Loại
+       * nào MỘT MÌNH đã đòi nới quá EXTEND_LIMIT thì loại khỏi hợp thay vì chặn
+       * cả lượt — nó sẽ tự nổ cảnh báo hình học ở bước xuất.
+       */
+      const lm = body.landmarks;
+      const frameSpecs = [
+        spec,
+        ...(Array.isArray(body.docIds) ? body.docIds : [])
+          .map((id) => getDoc(String(id)))
+          .filter(
+            (d): d is NonNullable<ReturnType<typeof getDoc>> =>
+              !!d &&
+              d.id !== spec.id &&
+              d.family === spec.family &&
+              d.backgrounds.includes(background)
+          ),
+      ].filter(
+        (d) =>
+          extendToFit(lm, src.width, src.height, [d], {
+            [spec.id]: headScale,
+          }).growth <= EXTEND_LIMIT
+      );
+
+      // Loại CHÍNH mà đã quá giới hạn thì không cứu được — báo chụp lại như cũ.
+      if (!frameSpecs.some((d) => d.id === spec.id)) {
         return Response.json(
           {
             error:
@@ -147,9 +193,34 @@ export async function POST(request: Request) {
           { status: 422 }
         );
       }
-      if (plan.growth > FLAT_FILL_LIMIT) {
-        input = await sharpExtend(image.buffer, plan.pad, bgHex(background));
-        inputSize = { width: plan.width, height: plan.height };
+
+      const plan = extendToFit(lm, src.width, src.height, frameSpecs, {
+        [spec.id]: headScale,
+      });
+      if (needsBodyFill(plan)) {
+        /*
+         * Nới DƯ mép dưới, không nới vừa khít.
+         *
+         * Landmark được đo LẠI trên ảnh model trả về, và model luôn xê dịch người
+         * vài phần trăm — nới vừa khít thì sau khi đo lại vẫn thiếu một dải đáy
+         * (đo thật: xin 9%, về vẫn hụt 3%), và dải đó bị lấp phẳng ở bước xuất:
+         * đường cắt trắng đè lên áo. Nới dư thì phần model vẽ thừa chỉ bị crop bỏ
+         * — vô hại, còn phần hụt là vết cắt giữa ngực. Hai rủi ro không đối xứng.
+         *
+         * Chỉ dư mép DƯỚI: ba mép kia là nền, hụt thì lấp phẳng vô hình.
+         */
+        const pad = {
+          ...plan.pad,
+          bottom:
+            plan.pad.bottom > 0
+              ? Math.ceil(plan.pad.bottom * 1.4 + src.height * 0.04)
+              : 0,
+        };
+        input = await sharpExtend(image.buffer, pad, bgHex(background));
+        inputSize = {
+          width: src.width + pad.left + pad.right,
+          height: src.height + pad.top + pad.bottom,
+        };
         fillMargins = true;
       }
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BACKGROUNDS,
   bgHex,
   getDoc,
   pxLabel,
@@ -31,6 +32,7 @@ export function Export({
   picked,
   onToggle,
   compliance,
+  readyBackgrounds,
   pendingCount,
   block,
   retouching,
@@ -59,6 +61,8 @@ export function Export({
   onToggle: (id: string) => void;
   /** Kết luận cho tập ĐANG chọn — tính lại mỗi lần tick */
   compliance: Compliance | null;
+  /** Những nền ĐÃ có bản chuẩn hoá — quyết định nhóm nào tick là xuất được ngay */
+  readyBackgrounds: BackgroundId[];
   /** Số nhóm nền còn phải thay — tick thêm loại có thể sinh nhóm nề��n mới */
   pendingCount: number;
   /** Vì sao chưa xuất được; `null` = xuất được */
@@ -90,6 +94,30 @@ export function Export({
    */
   const failing = compliance?.checks.filter((c) => c.required && !c.pass) ?? [];
 
+  /**
+   * Danh sách nhóm theo NỀN, không phải một dãy phẳng.
+   *
+   * Một nền = một ảnh đã chuẩn hoá = một lần gọi model. Dãy phẳng giấu mất ranh
+   * giới đó: ảnh vừa chuẩn hoá nền xanh mà Visa Mỹ (bắt buộc nền trắng) nằm ngay
+   * cạnh như thể cùng một ảnh — người dùng có lý khi hỏi "sao nền xanh lại xuất
+   * được visa Mỹ". Trả lời nằm ở cấu trúc: tick loại khác nền là bước sang nhóm
+   * khác, và nhóm đó nói ngay trên đầu là đã có ảnh hay cần thêm một lượt.
+   */
+  const groups = BACKGROUNDS.map((b) => ({
+    bg: b,
+    ready: readyBackgrounds.includes(b.id),
+    docs: docs.filter((d) => backgroundFor(d) === b.id),
+  }))
+    .filter((g) => g.docs.length > 0)
+    // Nhóm của loại chính đứng đầu — đó là ảnh khách vừa nhìn thấy.
+    .sort((a, b) =>
+      a.docs.some((d) => d.id === primary)
+        ? -1
+        : b.docs.some((d) => d.id === primary)
+          ? 1
+          : 0
+    );
+
   return (
     <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
       <BackBar onBack={onBack} title={t.exportTitle} />
@@ -97,73 +125,99 @@ export function Export({
         {t.exportSub}
       </p>
 
-      <div className="flex flex-col">
-        {docs.map((d) => {
-          const on = picked.includes(d.id);
-          const isPrimary = d.id === primary;
-          const w = workingFor(d.id);
-          const fit = on ? fitOf(d.id) : null;
-          return (
-            <button
-              key={d.id}
-              onClick={() => onToggle(d.id)}
-              aria-pressed={on}
-              disabled={isPrimary}
-              className="flex items-center gap-3 border-b border-n800 px-0.5 py-2.5 text-left"
-            >
-              <span className="w-[34px] flex-none overflow-hidden rounded-md shadow-[inset_0_0_0_1px_var(--color-neutral-700)]">
-                <CropPreview
-                  photo={w.photo}
-                  landmarks={w.landmarks}
-                  imgW={w.width}
-                  imgH={w.height}
-                  spec={d}
-                  backgroundHex={bgHex(backgroundFor(d))}
-                  headScale={headScaleOf(d.id)}
-                  brightness={brightness}
-                />
-              </span>
-              <span className="flex flex-1 flex-col gap-0.5">
-                <span className="text-[13px] font-bold">
-                  {lang === "vi" ? d.vi : d.en}
-                  {isPrimary ? (
-                    <span className="pl-1.5 text-[10px] font-semibold uppercase tracking-wider text-a300">
-                      {t.primaryTag}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="text-[10.5px] text-n500">{pxLabel(d)}</span>
-                {!d.verified ? (
-                  <span className="text-[10px] text-a300">{t.unverified}</span>
-                ) : null}
-                {/* Loại nào KHÔNG lấy được từ tấm ảnh này thì nói ngay ở dòng của
-                    nó, đừng để người dùng xuất ra rồi mới đọc cảnh báo. */}
-                {fit?.errors.length ? (
-                  <span className="text-[10px] leading-snug text-a300">
-                    {fit.errors[0]}
-                  </span>
-                ) : null}
-                {fit && !fit.resolutionOk ? (
-                  <span className="text-[10px] leading-snug text-a300">
-                    {t.lowRes}
-                  </span>
-                ) : null}
+      <div className="flex flex-col gap-4">
+        {groups.map((g) => (
+          <div key={g.bg.id} className="flex flex-col">
+            {/* Đầu nhóm: nền nào, và tick vào đây thì được gì — ảnh có sẵn hay
+                tốn thêm một lượt. Nói TRƯỚC khi tick, không phải sau. */}
+            <div className="flex items-center gap-2 border-b border-n700 pb-1.5">
+              <span
+                className="h-3 w-3 flex-none rounded-[3px] shadow-[inset_0_0_0_1px_var(--color-neutral-500)]"
+                style={{ background: g.bg.hex }}
+              />
+              <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-n300">
+                {lang === "vi" ? `Nền ${g.bg.vi.toLowerCase()}` : `${g.bg.en} background`}
               </span>
               <span
-                className="grid h-6 w-6 flex-none place-items-center rounded-full text-[13px] font-bold"
-                style={{
-                  color: on ? "var(--color-accent-2-900)" : "transparent",
-                  background: on ? "var(--color-accent-2-400)" : "transparent",
-                  boxShadow: on
-                    ? "none"
-                    : "inset 0 0 0 1.5px var(--color-neutral-700)",
-                }}
+                className={`ml-auto text-[10px] font-semibold ${
+                  g.ready ? "text-g400" : "text-n500"
+                }`}
               >
-                ✓
+                {g.ready ? `✓ ${t.bgGroupReady}` : t.bgGroupExtra}
               </span>
-            </button>
-          );
-        })}
+            </div>
+            {g.docs.map((d) => {
+              const on = picked.includes(d.id);
+              const isPrimary = d.id === primary;
+              const w = workingFor(d.id);
+              const fit = on ? fitOf(d.id) : null;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => onToggle(d.id)}
+                  aria-pressed={on}
+                  // Loại chính không bỏ tick được, nhưng KHÔNG được mờ đi — mờ đọc
+                  // ra là "không dùng được", trong khi đây là tấm ảnh gốc của cả phiên.
+                  disabled={isPrimary}
+                  className="flex items-center gap-3 border-b border-n800 px-0.5 py-2.5 text-left disabled:cursor-default disabled:opacity-100"
+                >
+                  {/* Chip VUÔNG — cùng lý do với khung preview: sản phẩm là ảnh
+                      chữ nhật, bo tròn là vẽ sai nó. */}
+                  <span className="w-[34px] flex-none overflow-hidden shadow-[inset_0_0_0_1px_var(--color-neutral-700)]">
+                    <CropPreview
+                      photo={w.photo}
+                      landmarks={w.landmarks}
+                      imgW={w.width}
+                      imgH={w.height}
+                      spec={d}
+                      backgroundHex={bgHex(backgroundFor(d))}
+                      headScale={headScaleOf(d.id)}
+                      brightness={brightness}
+                    />
+                  </span>
+                  <span className="flex flex-1 flex-col gap-0.5">
+                    <span className="text-[13px] font-bold">
+                      {lang === "vi" ? d.vi : d.en}
+                      {isPrimary ? (
+                        <span className="pl-1.5 text-[10px] font-semibold uppercase tracking-wider text-a300">
+                          {t.primaryTag}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="text-[10.5px] text-n500">{pxLabel(d)}</span>
+                    {!d.verified ? (
+                      <span className="text-[10px] text-a300">{t.unverified}</span>
+                    ) : null}
+                    {/* Loại nào KHÔNG lấy được từ tấm ảnh này thì nói ngay ở dòng
+                        của nó, đừng để người dùng xuất ra rồi mới đọc cảnh báo. */}
+                    {fit?.errors.length ? (
+                      <span className="text-[10px] leading-snug text-a300">
+                        {fit.errors[0]}
+                      </span>
+                    ) : null}
+                    {fit && !fit.resolutionOk ? (
+                      <span className="text-[10px] leading-snug text-a300">
+                        {t.lowRes}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span
+                    className="grid h-6 w-6 flex-none place-items-center rounded-[6px] text-[13px] font-bold"
+                    style={{
+                      color: on ? "var(--color-accent-2-900)" : "transparent",
+                      background: on ? "var(--color-accent-2-400)" : "transparent",
+                      boxShadow: on
+                        ? "none"
+                        : "inset 0 0 0 1.5px var(--color-neutral-700)",
+                    }}
+                  >
+                    ✓
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       {failing.length ? (
@@ -207,7 +261,7 @@ export function Export({
                   <button
                     key={id}
                     onClick={() => onSheetDoc(id)}
-                    className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold ${
+                    className={`rounded-[6px] px-2.5 py-1 text-[10.5px] font-semibold ${
                       on
                         ? "bg-n900 text-n100"
                         : "text-n700 shadow-[inset_0_0_0_1.5px_var(--color-neutral-400)]"

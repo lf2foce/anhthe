@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { newSessionId, ownsKey } from "./storage";
 import { watermarked } from "./watermark";
@@ -114,5 +114,80 @@ describe("watermark", () => {
       }
       expect(max - min, `mảng (${left},${top}) sạch dấu`).toBeGreaterThan(8);
     }
+  });
+});
+
+describe("proxyAllowed — chốt của proxy tải hộ /api/blob", () => {
+  /**
+   * Route nhận nguyên một URL từ client rồi fetch — không khoá thì đó là máy
+   * SSRF công cộng. Ba chốt phải cùng đứng: đúng host R2 của mình, đúng thư mục
+   * của khách đang gọi, và (ở tầng R2) chữ ký presigned còn hạn.
+   */
+  async function load() {
+    vi.stubEnv("PHOTO_R2_ACCOUNT_ID", "acc123");
+    vi.stubEnv("PHOTO_R2_ACCESS_KEY_ID", "k");
+    vi.stubEnv("PHOTO_R2_SECRET_ACCESS_KEY", "s");
+    vi.stubEnv("PHOTO_R2_BUCKET", "bucket");
+    vi.resetModules();
+    return import("./storage");
+  }
+  // Dạng THẬT SDK ký ra (đối chiếu từ link sống): bucket là SUBDOMAIN.
+  // Bản đầu của proxyAllowed chỉ nhận dạng path-style và chặn nhầm chính link
+  // mình vừa ký — test cũng bịa URL cùng kiểu nên xanh giả. Đóng băng dạng thật.
+  const good = "https://bucket.acc123.r2.cloudflarestorage.com/client-a/sess/x.jpg?X-Amz-Signature=abc";
+  const goodPathStyle = "https://acc123.r2.cloudflarestorage.com/bucket/client-a/sess/x.jpg?X-Amz-Signature=abc";
+
+  it("link virtual-hosted (dạng SDK ký thật): cho qua", async () => {
+    const { proxyAllowed } = await load();
+    expect(proxyAllowed("client-a", good)).toBe(true);
+  });
+
+  it("dạng path-style cũng qua — cùng một object", async () => {
+    const { proxyAllowed } = await load();
+    expect(proxyAllowed("client-a", goodPathStyle)).toBe(true);
+  });
+
+  it("thư mục của NGƯỜI KHÁC: chặn — đây là ảnh khuôn mặt", async () => {
+    const { proxyAllowed } = await load();
+    expect(proxyAllowed("client-b", good)).toBe(false);
+    expect(proxyAllowed("client-b", goodPathStyle)).toBe(false);
+  });
+
+  it("host lạ: chặn — kể cả khi path trông y hệt", async () => {
+    const { proxyAllowed } = await load();
+    expect(
+      proxyAllowed("client-a", "https://evil.example.com/bucket/client-a/sess/x.jpg")
+    ).toBe(false);
+    // host CHỨA host thật cũng không được — so bằng, không so đuôi
+    expect(
+      proxyAllowed(
+        "client-a",
+        "https://acc123.r2.cloudflarestorage.com.evil.example.com/bucket/client-a/x.jpg"
+      )
+    ).toBe(false);
+    // bucket giả trên subdomain sâu hơn cũng không được
+    expect(
+      proxyAllowed(
+        "client-a",
+        "https://bucket.acc123.r2.cloudflarestorage.com.evil.example.com/client-a/x.jpg"
+      )
+    ).toBe(false);
+  });
+
+  it("http thường, path leo thang, rác không parse được: chặn hết", async () => {
+    const { proxyAllowed } = await load();
+    expect(proxyAllowed("client-a", good.replace("https:", "http:"))).toBe(false);
+    expect(
+      proxyAllowed("client-a", "https://bucket.acc123.r2.cloudflarestorage.com/client-a/../client-b/x.jpg")
+    ).toBe(false);
+    expect(proxyAllowed("client-a", "khong-phai-url")).toBe(false);
+  });
+
+  it("chưa cấu hình R2 thì đóng hẳn — chế độ data URL không cần proxy", async () => {
+    vi.unstubAllEnvs();
+    vi.stubEnv("PHOTO_R2_ACCOUNT_ID", "");
+    vi.resetModules();
+    const { proxyAllowed } = await import("./storage");
+    expect(proxyAllowed("client-a", good)).toBe(false);
   });
 });

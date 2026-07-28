@@ -43,8 +43,22 @@ export function retouchPhoto(opts: {
   photo: string;
   /** Loại giấy tờ — server suy họ từ đây để biết được phép sửa những gì */
   docId: string;
+  /**
+   * TOÀN BỘ loại đang chọn dùng chung nền này — khung dựng phải là HỢP của mọi
+   * khổ, không phải riêng loại chính. Thiếu nó thì loại cao hơn (4×6 cạnh 3×4)
+   * bị lấp phẳng phần thân dưới lúc xuất — đúng ca "lòi cái trắng".
+   */
+  docIds: string[];
   /** Landmark ảnh gốc — server cần để biết phải nới khung bao nhiêu */
   landmarks: FaceLandmarks;
+  /**
+   * Cỡ đầu người dùng đang chọn (1 = target của spec).
+   *
+   * BẮT BUỘC gửi: nới khung bao nhiêu phụ thuộc thẳng vào nó — đầu nhỏ hơn thì
+   * khung rộng hơn, cần vẽ thêm nhiều thân hơn. Thiếu nó thì server dựng theo
+   * target, và người kéo cỡ khác rồi bấm chuẩn hoá lại vẫn nhận đúng phần nới cũ.
+   */
+  headScale: number;
   background: BackgroundId;
   smooth: boolean;
   evenLighting: boolean;
