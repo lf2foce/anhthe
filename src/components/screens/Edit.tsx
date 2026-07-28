@@ -81,20 +81,39 @@ export function Edit({
       {/* Khung ảnh CANH GIỮA có đệm quanh, không dán sát mép. Ảnh dán sát mép
           thì phần nới khung (nền thêm vào quanh đầu) trông như lỗi render; có
           đệm và viền thì nó đọc ra là một tấm ảnh thành phẩm đặt trên bàn. */}
-      <div className="relative z-10 grid h-[300px] flex-none place-items-center overflow-hidden bg-n800 p-4 lg:h-full lg:min-w-0 lg:flex-1 lg:p-8">
-        <CropPreview
-          photo={working.photo}
-          landmarks={working.landmarks}
-          imgW={working.width}
-          imgH={working.height}
-          spec={spec}
-          backgroundHex={bgHex(bg)}
-          headScale={headScale}
-          brightness={brightness}
-          guides
-          labels={{ crown: t.crownLine, eye: t.eyeLine }}
-          className="max-h-full max-w-full rounded-lg shadow-[0_8px_28px_rgba(0,0,0,.45)] ring-1 ring-n700"
-        />
+      <div
+        className="relative z-10 grid h-[300px] flex-none place-items-center overflow-hidden bg-n800 p-4 lg:h-full lg:min-w-0 lg:flex-1 lg:p-8"
+        style={{ containerType: "size" }}
+      >
+        {/*
+          Khung phải VỪA KHÍT ô chứa theo cả hai chiều — như `object-fit: contain`.
+          `aspect-ratio` KHÔNG tự tạo kích thước, nó chỉ suy chiều còn lại từ một
+          chiều đã biết; chỉ đặt `max-h/max-w` là không còn chiều nào và div co về
+          0×0 (ảnh biến mất hoàn toàn — đã xảy ra một lần).
+          Chốt chiều CAO bằng min(cao ô chứa, cao suy từ bề ngang ô chứa) thì luôn
+          có kích thước thật và không bao giờ tràn.
+        */}
+        <div
+          className="relative overflow-hidden rounded-lg shadow-[0_8px_28px_rgba(0,0,0,.45)] ring-1 ring-n700"
+          style={{
+            aspectRatio: `${spec.widthMm} / ${spec.heightMm}`,
+            height: `min(100cqh, calc(100cqw * ${spec.heightMm} / ${spec.widthMm}))`,
+          }}
+        >
+          <CropPreview
+            photo={working.photo}
+            landmarks={working.landmarks}
+            imgW={working.width}
+            imgH={working.height}
+            spec={spec}
+            backgroundHex={bgHex(bg)}
+            headScale={headScale}
+            brightness={brightness}
+            guides
+            labels={{ crown: t.crownLine, eye: t.eyeLine }}
+            className="h-full w-full"
+          />
+        </div>
         {/* Nút này nằm ĐÈ lên ảnh, nên nền mờ 55% biến nó thành vô hình trên ảnh
             sáng. Dùng nền đặc + viền sáng + đổ bóng để nổi trên mọi ảnh. */}
         <button
