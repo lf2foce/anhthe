@@ -64,6 +64,9 @@ export interface Copy {
   /** Model trả ảnh về nhưng đo ra nền vẫn chưa đổi */
   bgNotApplied: string;
   bgRetry: string;
+  redo: string;
+  peekHint: string;
+  peekOn: string;
 
   exportTitle: string;
   exportSub: string;
@@ -186,6 +189,9 @@ export const COPY: Record<Lang, Copy> = {
     bgNotApplied:
       "AI chưa đổi được nền — nền trong ảnh vẫn không đúng màu chuẩn. Thử lại, hoặc chụp trước một bức tường trơn.",
     bgRetry: "Thử thay nền lại",
+    redo: "Chuẩn hoá lại",
+    peekHint: "Giữ để xem ảnh gốc",
+    peekOn: "Ảnh gốc",
 
     exportTitle: "Xuất ảnh",
     exportSub:
@@ -310,6 +316,9 @@ export const COPY: Record<Lang, Copy> = {
     bgNotApplied:
       "The AI did not replace the background — it still is not the required colour. Try again, or shoot against a plain wall.",
     bgRetry: "Try replacing again",
+    redo: "Run again",
+    peekHint: "Hold to see the original",
+    peekOn: "Original",
 
     exportTitle: "Export",
     exportSub:

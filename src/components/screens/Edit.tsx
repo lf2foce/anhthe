@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
   BACKGROUNDS,
   bgHex,
@@ -18,6 +20,7 @@ export function Edit({
   t,
   lang,
   working,
+  before,
   spec,
   bg,
   allowed,
@@ -37,12 +40,15 @@ export function Edit({
   onSharpen,
   onRetouch,
   onRetryBg,
+  onRedo,
   onBack,
   onNext,
 }: {
   t: Copy;
   lang: Lang;
   working: Working;
+  /** Ảnh TRƯỚC khi chuẩn hoá — để so sánh; `null` khi chưa chuẩn hoá */
+  before: Working | null;
   /** Loại giấy tờ tấm ảnh được canh cho — màn này chỉ chỉnh cho đúng nó */
   spec: DocSpec;
   /** Nền đã resolve cho spec đang canh */
@@ -66,6 +72,8 @@ export function Edit({
   onSharpen: (v: boolean) => void;
   onRetouch: () => void;
   onRetryBg: () => void;
+  /** Chạy lại chuẩn hoá dù lần trước đã thành công — tốn một lượt */
+  onRedo: () => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -75,6 +83,14 @@ export function Edit({
   });
   const fit = computeCrop(plan.landmarks, plan.width, plan.height, spec, headScale);
   const doneCount = groups.length - pendingCount;
+  /**
+   * Giữ để xem ảnh gốc.
+   *
+   * Toàn bộ giá trị sản phẩm nằm ở phép biến đổi này, mà sau khi chạy xong thì
+   * khách không còn thấy nó nữa — vừa mất chỗ khoe, vừa mất đường tự kiểm.
+   */
+  const [peek, setPeek] = useState(false);
+  const shown = peek && before ? before : working;
 
   return (
     <div className="screen-in isolate flex h-full min-h-0 flex-col overflow-hidden bg-n900 lg:flex-row">
@@ -94,17 +110,18 @@ export function Edit({
           có kích thước thật và không bao giờ tràn.
         */}
         <div
-          className="relative overflow-hidden rounded-lg shadow-[0_8px_28px_rgba(0,0,0,.45)] ring-1 ring-n700"
+          // Góc VUÔNG: ảnh thẻ là hình chữ nhật, bo tròn preview là vẽ sai sản phẩm.
+          className="relative overflow-hidden shadow-[0_8px_28px_rgba(0,0,0,.45)] ring-1 ring-n700"
           style={{
             aspectRatio: `${spec.widthMm} / ${spec.heightMm}`,
             height: `min(100cqh, calc(100cqw * ${spec.heightMm} / ${spec.widthMm}))`,
           }}
         >
           <CropPreview
-            photo={working.photo}
-            landmarks={working.landmarks}
-            imgW={working.width}
-            imgH={working.height}
+            photo={shown.photo}
+            landmarks={shown.landmarks}
+            imgW={shown.width}
+            imgH={shown.height}
             spec={spec}
             backgroundHex={bgHex(bg)}
             headScale={headScale}
@@ -123,6 +140,19 @@ export function Edit({
         >
           ←
         </button>
+
+        {/* Giữ để xem ảnh gốc. Chạm/giữ chứ không phải bấm-đổi: so sánh kiểu
+            nhấp-qua-nhấp-lại khó thấy khác biệt hơn nhiều so với giữ rồi thả. */}
+        {before ? (
+          <button
+            onPointerDown={() => setPeek(true)}
+            onPointerUp={() => setPeek(false)}
+            onPointerLeave={() => setPeek(false)}
+            className="absolute bottom-3.5 left-1/2 -translate-x-1/2 rounded-full bg-n900/85 px-3.5 py-1.5 text-[11.5px] font-bold text-n100 shadow-[0_2px_10px_rgba(0,0,0,.45)] ring-1 ring-n100/30 backdrop-blur-sm"
+          >
+            {peek ? t.peekOn : t.peekHint}
+          </button>
+        ) : null}
       </div>
 
       <div className="scr relative z-0 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain rounded-t-[30px] bg-bg px-5 pb-6 pt-5 text-ink lg:w-[400px] lg:flex-none lg:rounded-l-[30px] lg:rounded-tr-none lg:pt-7">
@@ -275,13 +305,24 @@ export function Edit({
             </GhostButton>
           </div>
         ) : pendingCount === 0 ? (
-          <div className="flex items-center gap-2 text-[12px] font-semibold text-g700">
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-g500 text-[11px] text-white">
-              ✓
+          // Xong rồi thì trạng thái phải NÓI RÕ và phải có đường làm lại. Bản cũ
+          // chỉ có một dấu tích nhỏ lọt giữa danh sách: khách không ưng kết quả
+          // là hết đường, phải chụp lại từ đầu.
+          <div className="flex items-center justify-between gap-2 rounded-2xl bg-g100 px-3.5 py-2.5">
+            <span className="flex items-center gap-2 text-[12px] font-bold text-g800">
+              <span className="grid h-5 w-5 flex-none place-items-center rounded-full bg-g500 text-[11px] text-white">
+                ✓
+              </span>
+              {groups.length > 1
+                ? `${t.bgDone} · ${groups.length} ${lang === "vi" ? "nền" : "backgrounds"}`
+                : t.bgDone}
             </span>
-            {groups.length > 1
-              ? `${t.bgDone} · ${groups.length} ${lang === "vi" ? "nền" : "backgrounds"}`
-              : t.bgDone}
+            <button
+              onClick={onRedo}
+              className="flex-none rounded-full px-3 py-1.5 text-[11.5px] font-bold text-g800 shadow-[inset_0_0_0_1.5px_var(--color-accent-2-500)]"
+            >
+              {t.redo}
+            </button>
           </div>
         ) : (
           // Đây là bước BẮT BUỘC của luồng, không phải tuỳ chọn phụ. Bản cũ để

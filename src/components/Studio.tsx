@@ -401,6 +401,10 @@ export function Studio({
               t={t}
               lang={lang}
               working={editWorking}
+              before={
+                // Chỉ có gì để so khi bản đang xem KHÁC ảnh gốc.
+                editWorking !== original ? original : null
+              }
               spec={editSpec}
               bg={resolveBackground(editSpec, s.bgPref)}
               allowed={allowedBackgrounds(s.picked)}
@@ -431,6 +435,13 @@ export function Studio({
               onRetryBg={() =>
                 runRetouch(groups.filter((g) => failed.includes(g.background)))
               }
+              // Chạy lại TẤT CẢ các nhóm: xoá bản cũ trước để `pendingGroups`
+              // tính ra đủ, nếu không nó thấy nhóm nào cũng xong rồi và không chạy.
+              onRedo={() => {
+                retouchRun.current++;
+                setS((prev) => ({ ...prev, retouched: {}, files: null }));
+                runRetouch(groups);
+              }}
               onBack={() => patch({ screen: "check", error: null })}
               onNext={() => patch({ screen: "export", error: null })}
             />

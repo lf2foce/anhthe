@@ -12,7 +12,9 @@
  */
 export const BACKGROUNDS = [
   { id: "white", hex: "#ffffff", vi: "Trắng", en: "White" },
-  { id: "blue", hex: "#dfe9f2", vi: "Xanh nhạt", en: "Light blue" },
+  // Ảnh thẻ VN dùng phông xanh ĐẬM, không phải xanh nhạt. Sắc độ chính xác
+  // CHƯA đối chiếu văn bản — cùng diện `verified: false` với vn34/vn46.
+  { id: "blue", hex: "#1f5aa6", vi: "Xanh đậm", en: "Dark blue" },
   { id: "grey", hex: "#e9e6e0", vi: "Xám nhạt", en: "Light grey" },
 ] as const;
 
@@ -168,7 +170,7 @@ export const DOCS: DocSpec[] = [
     eyeFromBottom: { min: 0.58, target: 0.64, max: 0.7 },
     noteVi: "Dùng cho hồ sơ, giấy tờ hành chính",
     noteEn: "For forms and paperwork",
-    source: "Thông lệ ảnh thẻ VN (nền trắng hoặc xanh nhạt) — CHƯA đối chiếu văn bản",
+    source: "Thông lệ ảnh thẻ VN (nền trắng hoặc xanh đậm) — CHƯA đối chiếu văn bản, kể cả sắc độ xanh",
     verified: false,
   },
   {
@@ -185,7 +187,7 @@ export const DOCS: DocSpec[] = [
     eyeFromBottom: { min: 0.58, target: 0.64, max: 0.7 },
     noteVi: "Sơ yếu lý lịch, đơn từ",
     noteEn: "CVs and applications",
-    source: "Thông lệ ảnh thẻ VN (nền trắng hoặc xanh nhạt) — CHƯA đối chiếu văn bản",
+    source: "Thông lệ ảnh thẻ VN (nền trắng hoặc xanh đậm) — CHƯA đối chiếu văn bản, kể cả sắc độ xanh",
     verified: false,
   },
   {
