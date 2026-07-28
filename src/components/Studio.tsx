@@ -167,6 +167,7 @@ export function Studio({
         done[group.background] = await retouchPhoto({
           photo: s.photo,
           docId: s.primary,
+          landmarks: s.check!.landmarks,
           background: group.background,
           smooth: s.smooth,
           evenLighting,

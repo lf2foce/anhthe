@@ -194,6 +194,18 @@ mới suy ra bằng phép dịch; `sharpExtend` (render.ts) lấp phần thêm b
 chuẩn. Chỉ nới khi nền đã đo được là đúng màu — nền rối thì giữ nguyên cảnh báo,
 không nới bừa (chỗ nới sẽ lộ đường ghép).
 
+Nới ÍT thì lấp nền phẳng là đủ và vô hình. Nới NHIỀU (`> FLAT_FILL_LIMIT`) thì
+lấp phẳng cho ra **vai cụt giữa không trung** — nối được nền nhưng không nối được
+người. Lúc đó `/api/retouch` nới khung TRƯỚC rồi bảo model vẽ tiếp thân vào phần
+trống, trong CÙNG một lần gọi model. Nới quá `EXTEND_LIMIT` thì từ chối thẳng và
+bảo chụp lại — bắt model đoán quá nửa tấm ảnh là bịa, không phải nối.
+
+Điều này CÓ vượt ranh giới "không sửa ảnh giấy tờ" một chút, nên nói thẳng: model
+vẽ thêm phần vai và áo chưa từng nằm trong khung. Lập luận cho là được: khuôn mặt
+— thứ định danh — không bị đụng và được đo lại sau đó, còn phần thêm vào tương
+đương với việc đứng lùi ra xa hơn khi chụp. Nhưng đây là một lựa chọn, không phải
+điều hiển nhiên, và nó chỉ chạy khi ảnh thật sự thiếu khung.
+
 Bốn nơi kể cùng một câu chuyện: `evaluate` (dự đoán), `CropPreview` (phần thò ra
 ngoài ảnh hiện đúng màu nền container), màn Chỉnh sửa, và `/api/export` (sharp thật).
 Một điều đã kiểm bằng đại số + test: nới khung KHÔNG làm ảnh thiếu pixel thành đủ

@@ -25,7 +25,13 @@ import {
   backgroundDeviation,
   imageSize,
 } from "@/lib/render";
-import type { FaceLandmarks } from "@/lib/geometry";
+import {
+  EXTEND_LIMIT,
+  FLAT_FILL_LIMIT,
+  extendToFit,
+  type FaceLandmarks,
+} from "@/lib/geometry";
+import { sharpExtend } from "@/lib/render";
 import { NextResponse } from "next/server";
 
 import {
@@ -59,6 +65,8 @@ export async function POST(request: Request) {
   let body: {
     photo?: string;
     docId?: string;
+    /** Landmark đo ở bước kiểm tra — cần để biết phải nới khung bao nhiêu */
+    landmarks?: FaceLandmarks;
     background?: BackgroundId;
     smooth?: boolean;
     evenLighting?: boolean;
@@ -108,13 +116,55 @@ export async function POST(request: Request) {
   try {
     const src = await imageSize(image.buffer);
 
+    /*
+     * Nới khung TRƯỚC khi gửi model, không phải sau.
+     *
+     * Ảnh chụp gần hơn khung giấy tờ thì lấp nền phẳng cho ra vai cụt giữa không
+     * trung — nối được nền nhưng không nối được người. Nới trước rồi bảo model vẽ
+     * tiếp thân vào phần trống thì nó liền mạch, và vẫn chỉ tốn ĐÚNG một lần gọi
+     * model như cũ.
+     *
+     * Nới ít thì khỏi phiền model: dải thêm vào chỉ là nền, mắt không thấy.
+     */
+    let input = image.buffer;
+    let inputSize = src;
+    let fillMargins = false;
+
+    if (body.landmarks) {
+      const plan = extendToFit(
+        body.landmarks,
+        src.width,
+        src.height,
+        [spec]
+      );
+      if (plan.growth > EXTEND_LIMIT) {
+        return Response.json(
+          {
+            error:
+              "Ảnh chụp quá sát, thiếu quá nhiều khoảng trống quanh đầu để dựng đúng khung. Chụp lùi ra xa hơn giúp nhé.",
+            code: "TOO_TIGHT",
+          },
+          { status: 422 }
+        );
+      }
+      if (plan.growth > FLAT_FILL_LIMIT) {
+        input = await sharpExtend(image.buffer, plan.pad, bgHex(background));
+        inputSize = { width: plan.width, height: plan.height };
+        fillMargins = true;
+      }
+    }
+
     const edited = await retouch({
-      image: { data: image.base64, mimeType: image.mimeType },
-      width: src.width,
-      height: src.height,
+      image: {
+        data: input.toString("base64"),
+        mimeType: fillMargins ? "image/jpeg" : image.mimeType,
+      },
+      width: inputSize.width,
+      height: inputSize.height,
       backgroundHex: bgHex(background),
       smooth: !!body.smooth,
       evenLighting: !!body.evenLighting,
+      fillMargins,
       ...applied,
     });
 

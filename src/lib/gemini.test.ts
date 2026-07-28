@@ -21,6 +21,7 @@ function opts(over: Partial<RetouchOptions> = {}): RetouchOptions {
     outfit: "keep",
     polish: false,
     hiRes: false,
+    fillMargins: false,
     ...over,
   };
 }
@@ -135,6 +136,44 @@ describe("retouchPrompt — ảnh chân dung", () => {
 
   it("không bật gì thì prompt y như chế độ giấy tờ", () => {
     expect(retouchPrompt(opts())).toEqual(retouchPrompt(opts({ outfit: "keep" })));
+  });
+});
+
+describe("retouchPrompt — nới mép cho ảnh chụp quá sát", () => {
+  /**
+   * Lấp nền phẳng nối được NỀN nhưng không nối được NGƯỜI: ảnh hẹp hơn khung thì
+   * ra vai cụt giữa không trung. Nới mép trước rồi bảo model vẽ tiếp thân vào.
+   */
+  it("có lệnh vẽ tiếp thân vào phần trống", () => {
+    const p = retouchPrompt(opts({ fillMargins: true }));
+    expect(p).toContain("Vẽ TIẾP phần thân và vai");
+    expect(p).toContain("chụp lùi xa hơn");
+  });
+
+  it("lệnh nối thân đứng ĐẦU danh sách việc", () => {
+    // Nếu nó nằm cuối, model hay chỉ làm nền rồi bỏ qua — ta được đúng cái đang có.
+    const p = retouchPrompt(opts({ fillMargins: true, smooth: true }));
+    expect(p.indexOf("Vẽ TIẾP phần thân")).toBeLessThan(p.indexOf("Thay TOÀN BỘ nền"));
+  });
+
+  /**
+   * Đây là chỗ dễ hỏng nhất: vừa bảo model vẽ thêm vào mép, vừa bảo "giữ nguyên
+   * khung hình" là hai lệnh mâu thuẫn, và nó sẽ bỏ một trong hai.
+   */
+  it("KHÔNG còn câu 'giữ nguyên khung hình của ảnh gốc' khi đang nới mép", () => {
+    const p = retouchPrompt(opts({ fillMargins: true }));
+    expect(p).not.toContain("Giữ nguyên khung hình và tỉ lệ khung của ảnh gốc");
+    expect(p).toContain("đã bao gồm phần nới");
+  });
+
+  it("vẫn cấm xê dịch và phóng to người", () => {
+    const p = retouchPrompt(opts({ fillMargins: true }));
+    expect(p).toContain("KHÔNG di chuyển");
+    expect(p).toContain("giữ NGUYÊN");
+  });
+
+  it("không bật thì prompt không nhắc gì tới nới mép", () => {
+    expect(retouchPrompt(opts())).not.toContain("Vẽ TIẾP");
   });
 });
 

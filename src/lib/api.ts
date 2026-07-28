@@ -1,6 +1,7 @@
 /** Client — ba lệnh gọi server của luồng. Lỗi luôn ném ra dạng Error có câu chữ đọc được. */
 
 import type { PhotoCheck } from "./checks";
+import type { FaceLandmarks } from "./geometry";
 import type { BackgroundId } from "./docs";
 import type { Working } from "./studio";
 import type { ExportedFile, ExportGroup } from "@/app/api/export/route";
@@ -42,6 +43,8 @@ export function retouchPhoto(opts: {
   photo: string;
   /** Loại giấy tờ — server suy họ từ đây để biết được phép sửa những gì */
   docId: string;
+  /** Landmark ảnh gốc — server cần để biết phải nới khung bao nhiêu */
+  landmarks: FaceLandmarks;
   background: BackgroundId;
   smooth: boolean;
   evenLighting: boolean;

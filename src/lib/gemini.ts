@@ -264,6 +264,11 @@ export interface RetouchOptions {
   outfit: OutfitId;
   polish: boolean;
   hiRes: boolean;
+  /**
+   * Ảnh gửi lên đã được nới mép bằng nền phẳng, và model phải VẼ TIẾP người vào
+   * phần nới đó. Bật khi ảnh gốc quá hẹp so với khung giấy tờ.
+   */
+  fillMargins: boolean;
 }
 
 /**
@@ -289,6 +294,12 @@ export function retouchPrompt(o: RetouchOptions): string {
     jobs.push(
       "Làm mịn da RẤT NHẸ: chỉ giảm bóng dầu và vết đỏ. Giữ nguyên lỗ chân lông, nếp nhăn, nốt ruồi, râu."
     );
+  if (o.fillMargins)
+    // Đặt TRƯỚC các việc khác: nếu model chỉ làm nền mà bỏ qua việc nối người,
+    // ta được đúng cái đang có — vai cụt giữa nền phẳng.
+    jobs.unshift(
+      "Ảnh này đã được nới rộng khung: quanh mép có dải nền phẳng trống. Vẽ TIẾP phần thân và vai của chính người này vào dải trống đó cho liền mạch tự nhiên, như thể ảnh vốn được chụp lùi xa hơn. Phần đã có sẵn giữ NGUYÊN, không vẽ lại, không xê dịch."
+    );
   if (o.outfit !== "keep") jobs.push(OUTFIT_PROMPT[o.outfit]);
   if (o.polish)
     jobs.push(
@@ -304,8 +315,14 @@ export function retouchPrompt(o: RetouchOptions): string {
   // Sàn chung cho CẢ HAI chế độ: ảnh phải vẫn là người đó.
   const limits = [
     "KHÔNG đổi khuôn mặt thành người khác: giữ nguyên đường nét, tỉ lệ, màu mắt, kiểu tóc, độ tuổi.",
-    "KHÔNG di chuyển, xoay, phóng to, thu nhỏ hay cắt cúp lại người trong khung. Người phải ở NGUYÊN vị trí và NGUYÊN kích thước như ảnh gốc.",
-    "Giữ nguyên khung hình và tỉ lệ khung của ảnh gốc.",
+    // Khi đang nới mép thì câu "giữ nguyên khung" là MÂU THUẪN với việc vừa yêu
+    // cầu — bảo model vừa vẽ thêm vừa không được đổi khung thì nó bỏ một trong hai.
+    o.fillMargins
+      ? "KHÔNG di chuyển, xoay, phóng to hay thu nhỏ người. Vị trí và kích thước của người trong ảnh phải giữ NGUYÊN; chỉ được vẽ thêm vào phần mép trống."
+      : "KHÔNG di chuyển, xoay, phóng to, thu nhỏ hay cắt cúp lại người trong khung. Người phải ở NGUYÊN vị trí và NGUYÊN kích thước như ảnh gốc.",
+    o.fillMargins
+      ? "Giữ nguyên tỉ lệ khung của ảnh được cung cấp (đã bao gồm phần nới)."
+      : "Giữ nguyên khung hình và tỉ lệ khung của ảnh gốc.",
   ];
 
   if (!portraitMode) {

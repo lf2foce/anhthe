@@ -201,6 +201,13 @@ export interface ExtendPlan {
   landmarks: FaceLandmarks;
   /** Có phải nới thật không, hay ảnh đã đủ rộng */
   needed: boolean;
+  /**
+   * Phần nới chiếm bao nhiêu so với ảnh gốc (0 = không nới, 0.5 = rộng thêm nửa).
+   *
+   * Quyết định cách lấp: nới ít thì lấp nền phẳng là vô hình; nới nhiều thì lấp
+   * phẳng cho ra vai cụt giữa không trung — phải nhờ model vẽ tiếp người.
+   */
+  growth: number;
 }
 
 export const NO_PAD: CanvasPad = { top: 0, left: 0, right: 0, bottom: 0 };
@@ -261,6 +268,10 @@ export function extendToFit(
   const width = imgW + pad.left + pad.right;
   const height = imgH + pad.top + pad.bottom;
   const needed = width !== imgW || height !== imgH;
+  const growth = Math.max(
+    imgW > 0 ? (width - imgW) / imgW : 0,
+    imgH > 0 ? (height - imgH) / imgH : 0
+  );
 
   return {
     pad,
@@ -277,8 +288,20 @@ export function extendToFit(
         }
       : lm,
     needed,
+    growth,
   };
 }
+
+/**
+ * Nới tới mức nào thì lấp nền phẳng còn qua mắt được.
+ *
+ * Dưới ngưỡng: dải thêm vào chỉ là nền, mắt không thấy. Trên ngưỡng: phần thêm
+ * đủ rộng để lộ ra vai bị cắt cụt giữa nền phẳng — lúc đó phải nhờ model vẽ tiếp.
+ */
+export const FLAT_FILL_LIMIT = 0.08;
+
+/** Nới quá mức này thì ảnh gốc thật sự không dùng được, đừng bắt model đoán */
+export const EXTEND_LIMIT = 0.8;
 
 
 /**
