@@ -9,7 +9,7 @@ import {
 } from "@/lib/docs";
 import type { Compliance } from "@/lib/checks";
 import { CHECK_LABELS, type Copy, type Lang } from "@/lib/i18n";
-import type { Working } from "@/lib/studio";
+import type { ExportBlock, Working } from "@/lib/studio";
 import { CropPreview } from "@/components/CropPreview";
 import {
   BackBar,
@@ -32,6 +32,7 @@ export function Export({
   onToggle,
   compliance,
   pendingCount,
+  block,
   retouching,
   onRetouch,
   brightness,
@@ -58,8 +59,10 @@ export function Export({
   onToggle: (id: string) => void;
   /** Kết luận cho tập ĐANG chọn — tính lại mỗi lần tick */
   compliance: Compliance | null;
-  /** Số nhóm nền còn phải thay — tick thêm loại có thể sinh nhóm nền mới */
+  /** Số nhóm nền còn phải thay — tick thêm loại có thể sinh nhóm nề��n mới */
   pendingCount: number;
+  /** Vì sao chưa xuất được; `null` = xuất được */
+  block: ExportBlock;
   retouching: boolean;
   onRetouch: () => void;
   brightness: number;
@@ -234,9 +237,21 @@ export function Export({
             <Spinner label={t.exporting} />
           </div>
         ) : (
-          <PrimaryButton onClick={onExport} disabled={picked.length === 0}>
-            {lang === "vi" ? `Xuất ${count} tệp` : `Export ${count} files`}
-          </PrimaryButton>
+          <>
+            {/* Disable CÂM là tệ nhất: khách bấm không được mà không biết vì sao.
+                Nói lý do ngay trên nút. */}
+            {block ? (
+              <p className="m-0 pb-2 text-center text-[11.5px] leading-snug text-a300">
+                {block === "failed-background" ? t.blockBgFailed : t.blockBgPending}
+              </p>
+            ) : null}
+            <PrimaryButton
+              onClick={onExport}
+              disabled={picked.length === 0 || block !== null}
+            >
+              {lang === "vi" ? `Xuất ${count} tệp` : `Export ${count} files`}
+            </PrimaryButton>
+          </>
         )}
       </div>
     </div>

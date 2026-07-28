@@ -201,6 +201,22 @@ export function retouchVerified(s: StudioState): boolean {
   return groups.every((g) => s.retouched[g.background]?.backgroundOk === true);
 }
 
+/**
+ * Đã đủ điều kiện xuất file chưa.
+ *
+ * Đây là chốt cuối của lời hứa cốt lõi. Không có nó thì luồng vẫn cho đi thẳng
+ * Kiểm tra → Chỉnh sửa → Xuất ảnh và giao file cắt từ ảnh GỐC nền phòng khách —
+ * đúng thứ màn Kiểm tra vừa hứa là "app sửa tự động ở bước sau".
+ */
+export type ExportBlock = "pending-background" | "failed-background" | null;
+
+export function exportBlock(s: StudioState): ExportBlock {
+  if (!originalWorking(s)) return "pending-background";
+  if (failedBackgrounds(s).length > 0) return "failed-background";
+  if (pendingGroups(s).length > 0) return "pending-background";
+  return null;
+}
+
 /** Payload cho /api/export: mỗi nhóm nền kèm ảnh và landmark của chính nó */
 export function exportGroups(s: StudioState): ExportGroup[] {
   const original = originalWorking(s);

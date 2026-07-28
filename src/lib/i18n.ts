@@ -70,6 +70,9 @@ export interface Copy {
   /** Nhãn cạnh loại chính ở màn Xuất ảnh */
   primaryTag: string;
   stillFailing: string;
+  /** Vì sao nút Xuất đang khoá */
+  blockBgPending: string;
+  blockBgFailed: string;
   /** Loại mới tick đòi màu nền khác */
   needMoreBg: string;
   lowRes: string;
@@ -189,6 +192,10 @@ export const COPY: Record<Lang, Copy> = {
       "Thêm cỡ nào cũng được — cùng bức ảnh vừa ưng, cắt đúng tỉ lệ cho từng loại.",
     primaryTag: "đã canh",
     stillFailing: "Chưa đạt từ bước kiểm tra, không liên quan loại vừa thêm:",
+    blockBgPending:
+      "Cần chuẩn hoá ảnh trước khi xuất — chưa làm thì file cắt ra vẫn là nền ảnh gốc.",
+    blockBgFailed:
+      "Nền chưa đúng màu chuẩn. Thử chuẩn hoá lại trước khi xuất, nếu không ảnh sẽ bị từ chối ở quầy.",
     needMoreBg:
       "Loại vừa thêm cần màu nền khác — phải thay nền thêm một lần cho màu đó.",
     lowRes: "Thiếu điểm ảnh — file sẽ bị phóng to và mềm nét",
@@ -309,6 +316,10 @@ export const COPY: Record<Lang, Copy> = {
       "Add any size — the same photo you just approved, cropped per document.",
     primaryTag: "framed",
     stillFailing: "Already failing since the check step, unrelated to what you added:",
+    blockBgPending:
+      "Run the compliance step before exporting — until then the crop still has your original background.",
+    blockBgFailed:
+      "The background is not the required colour yet. Run it again before exporting, or the photo will be rejected.",
     needMoreBg:
       "The type you just added needs a different background — one more replacement pass for that colour.",
     lowRes: "Not enough pixels — this file will be upscaled and look soft",

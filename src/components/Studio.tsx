@@ -17,6 +17,7 @@ import {
   INITIAL,
   SCREENS,
   compliance,
+  exportBlock,
   exportGroups,
   failedBackgrounds,
   fileCount,
@@ -448,6 +449,7 @@ export function Studio({
               onToggle={toggleDoc}
               compliance={fit}
               pendingCount={pending.length}
+              block={exportBlock(s)}
               retouching={s.retouching}
               onRetouch={() => runRetouch(pending)}
               brightness={s.brightness}
