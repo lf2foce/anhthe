@@ -37,7 +37,7 @@ export function Check({
   return (
     // Nền SÁNG như phần còn lại của app — màn này là BÁO CÁO chấm điểm, không
     // phải màn soi ảnh, nên không có lý do giữ nền tối.
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-7 pt-8 font-body text-pop-ink">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-4 pt-5 font-body text-pop-ink">
       <BackBar onBack={onBack} title={t.checkTitle} dark={false} />
 
       {checking ? <Scanning t={t} photo={photo} /> : null}

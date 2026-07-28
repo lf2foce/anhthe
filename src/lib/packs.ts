@@ -25,6 +25,29 @@ export interface StylePack {
   thumb: string;
 }
 
+/**
+ * Nhãn tỉ lệ đọc được từ kích thước thật của ảnh — KHÔNG lấy từ tuỳ chọn đang
+ * bật: tuỳ chọn áp cho lô SAU, còn ảnh đang xem có thể thuộc lô cũ tỉ lệ khác.
+ * Model cũng có quyền trả lệch một chút, nên đo ảnh thật là nguồn duy nhất đúng.
+ */
+export function ratioLabel(w: number, h: number): string {
+  const known: Array<[string, number]> = [
+    ["1:1", 1],
+    ["3:4", 3 / 4],
+    ["4:5", 4 / 5],
+    ["9:16", 9 / 16],
+    ["4:3", 4 / 3],
+    ["3:2", 3 / 2],
+    ["16:9", 16 / 9],
+    ["2:3", 2 / 3],
+  ];
+  const r = w / h;
+  for (const [label, val] of known) {
+    if (Math.abs(r - val) / val < 0.03) return label;
+  }
+  return `${w}:${h}`;
+}
+
 /** Các khung người dùng chọn được — tập con danh sách model hỗ trợ */
 export const ASPECT_CHOICES = ["1:1", "3:4", "4:5", "9:16"] as const;
 export type AspectChoice = (typeof ASPECT_CHOICES)[number];

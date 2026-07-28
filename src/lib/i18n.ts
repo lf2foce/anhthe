@@ -114,6 +114,8 @@ export interface Copy {
   /** Nhắc là ảnh cũ vẫn dùng được khi đổi phong cách */
   packsReuse: string;
   generating: string;
+  /** Dòng chờ dưới spinner khi đang vẽ lô đầu — cho biết đợi bao lâu là bình thường */
+  generatingHint: string;
   moreShots: string;
   changeStyle: string;
   newPhoto: string;
@@ -246,6 +248,7 @@ export const COPY: Record<Lang, Copy> = {
     packsSub: "Chọn một phong cách là tạo ngay. Xem xong dặn AI chỉnh tiếp tới khi ưng.",
     packsReuse: "Ảnh bạn vừa dùng vẫn còn — chọn phong cách khác là tạo được ngay.",
     generating: "AI đang vẽ…",
+    generatingHint: "Thường 10–20 giây mỗi ảnh — cứ để màn hình mở.",
     moreShots: "Tạo thêm",
     changeStyle: "Đổi phong cách",
     newPhoto: "Dùng ảnh khác",
@@ -381,6 +384,7 @@ export const COPY: Record<Lang, Copy> = {
     packsSub: "Pick a style and it generates right away. Then tell the AI what to tweak until you love it.",
     packsReuse: "Your last photo is still loaded — pick another style to generate right away.",
     generating: "AI is drawing…",
+    generatingHint: "Usually 10–20s per image — keep this tab open.",
     moreShots: "More shots",
     changeStyle: "Change style",
     newPhoto: "Use another photo",

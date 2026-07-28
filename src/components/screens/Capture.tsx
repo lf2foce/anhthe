@@ -91,7 +91,7 @@ export function Capture({
     // Khung ngoài SÁNG như cả app; chỉ RIÊNG viewfinder là thẻ tối — video vốn
     // tối, và một tấm thẻ tối có viền đọc ra là "màn hình máy ảnh" chứ không
     // phải cả căn phòng tối đè lên giao diện.
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in flex h-full flex-col gap-3.5 bg-pop-bg px-4 pb-6 pt-8 font-body text-pop-ink">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in flex h-full flex-col gap-3.5 bg-pop-bg px-4 pb-4 pt-5 font-body text-pop-ink">
       <BackBar onBack={onBack} title={t.capTitle} dark={false} />
 
       <div className="relative flex-1 overflow-hidden rounded-[28px] border-2 border-pop-ink bg-viol-1 shadow-[5px_5px_0_var(--color-pop-ink)]">

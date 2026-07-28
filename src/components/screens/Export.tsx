@@ -119,7 +119,7 @@ export function Export({
     );
 
   return (
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] lg:[&>*]:max-w-[1020px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-7 pt-8 font-body text-pop-ink">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] lg:[&>*]:max-w-[1020px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-4 pt-5 font-body text-pop-ink">
       {/* Màn rộng: HAI CỘT — trái chọn loại, phải tờ in + nút xuất. Tiêu đề
           nằm TRONG cột trái để cột phải leo lên tận đỉnh — để ngoài thì tấm tờ
           in bị đẩy xuống dưới một khoảng trống vô nghĩa (phản hồi thật). */}

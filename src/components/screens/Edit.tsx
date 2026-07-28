@@ -186,7 +186,7 @@ export function Edit({
           còn là tấm sheet dài dính vào mép phải. Mỗi bậc một thẻ, trạng thái
           chuẩn hoá sống TRONG thẻ bậc 1 (nó là kết quả của bậc đó), nút sang
           bước sau đứng riêng dưới cùng. */}
-      <div className="scr relative z-0 flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain px-4 pb-6 pt-4 font-body text-pop-ink lg:w-[420px] lg:flex-none lg:px-5 lg:pt-6">
+      <div className="scr relative z-0 flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain px-4 pb-4 pt-4 font-body text-pop-ink lg:w-[420px] lg:flex-none lg:px-5 lg:pt-6">
         {/* Đang canh cho loại nào — nổi trên mặt bàn, không cần thẻ */}
         <div className="flex items-center justify-between gap-2">
           <span className="font-display text-[17px] font-bold">

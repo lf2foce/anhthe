@@ -26,6 +26,7 @@ import { decodeDataUrl } from "@/lib/imageio";
 import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
 import { checkSize, remainingFor, withClientCookie } from "@/lib/gate";
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/errors";
 import {
   BACKGROUND_TOLERANCE,
   backgroundDeviation,
@@ -371,8 +372,7 @@ export async function POST(request: Request) {
       clientId
     );
   } catch (e) {
-    console.error("[api/export]", e);
-    return Response.json({ error: (e as Error).message }, { status: 500 });
+    return errorResponse("api/export", e);
   }
 }
 

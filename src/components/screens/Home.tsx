@@ -51,7 +51,7 @@ export function Home({
     // đây thừa hai mảng trống hai bên còn nội dung thì dồn thành cột hẹp dài.
     // Không còn bóng bay nội bộ — shell đã có, thêm ở đây thì bị mép container
     // cắt thành một vệt màu vô nghĩa (đã dính).
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[880px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-8 pt-8 font-body text-pop-ink">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[880px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-4 pt-5 font-body text-pop-ink">
       <div className="flex flex-col gap-2.5">
         <span
           className={`w-fit -rotate-2 rounded-full border-2 border-pop-ink bg-pink px-3 py-1 text-[10.5px] font-bold text-white ${POP}`}

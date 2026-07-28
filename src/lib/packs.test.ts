@@ -13,6 +13,7 @@ import {
   buildPackPrompt,
   buildRefinePrompt,
   getPack,
+  ratioLabel,
 } from "./packs";
 
 describe("registry pack", () => {
@@ -106,5 +107,29 @@ describe("buildRefinePrompt — vòng lặp trên ảnh đã sinh", () => {
     const up = buildRefinePrompt("", true);
     expect(up).toContain("GIỮ NGUYÊN bố cục");
     expect(up).toContain("độ phân giải");
+  });
+});
+
+describe("ratioLabel — nhãn tỉ lệ đọc từ kích thước THẬT của ảnh", () => {
+  /**
+   * Nhãn phải suy từ ảnh, không từ tuỳ chọn đang bật: tuỳ chọn áp cho lô SAU,
+   * còn ảnh đang xem có thể thuộc lô cũ tỉ lệ khác — và model có quyền trả lệch
+   * vài pixel so với tỉ lệ đặt hàng.
+   */
+  it("khớp các tỉ lệ quen thuộc, kể cả lệch vài pixel do model", () => {
+    expect(ratioLabel(1024, 1024)).toBe("1:1");
+    expect(ratioLabel(1080, 1350)).toBe("4:5");
+    expect(ratioLabel(768, 1024)).toBe("3:4");
+    expect(ratioLabel(1080, 1920)).toBe("9:16");
+    // lệch ~1% — vẫn phải đọc ra 4:5 chứ không rơi về số thô
+    expect(ratioLabel(1080, 1340)).toBe("4:5");
+  });
+
+  it("tỉ lệ lạ thì trả số thô, không ép vào nhãn sai", () => {
+    // 1000×1234 KHÔNG dùng làm ca "lạ" được: 0.810 lệch 1.3% khỏi 4:5, nằm
+    // trong dung sai 3% và PHẢI đọc ra 4:5 — đó là mục đích của dung sai.
+    expect(ratioLabel(1000, 1234)).toBe("4:5");
+    // 0.714 lệch ~5% khỏi 3:4 và xa mọi nhãn khác — mới thật sự là lạ.
+    expect(ratioLabel(1000, 1400)).toBe("1000:1400");
   });
 });

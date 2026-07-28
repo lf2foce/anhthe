@@ -87,7 +87,7 @@ export function Done({
 
   return (
     // Màn ăn mừng: nền sáng + mint, cùng ngôn ngữ pop với cả app.
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-7 pt-9 font-body text-pop-ink">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-4 pt-6 font-body text-pop-ink">
       <div className="relative flex flex-col gap-2.5">
         <span className="grid h-[74px] w-[74px] -rotate-3 place-items-center rounded-full border-2 border-pop-ink bg-mint text-[34px] text-white shadow-[4px_4px_0_var(--color-pop-ink)]">
           ✓

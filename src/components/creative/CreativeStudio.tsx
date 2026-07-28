@@ -18,6 +18,7 @@ import { downloadUrl, fetchBlob } from "@/lib/capture";
 import type { StoredImage } from "@/lib/storage";
 import {
   ASPECT_CHOICES,
+  ratioLabel,
   MAX_NOTE_LENGTH,
   PACKS,
   getPack,
@@ -68,6 +69,8 @@ export function CreativeStudio({
   /** Ảnh cùng một phiên nằm chung thư mục trên storage — dọn theo TTL cho gọn */
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sel, setSel] = useState(0);
+  /** Kích thước thật của ảnh đang xem — đọc từ onLoad, cho chip tỉ lệ */
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -221,68 +224,99 @@ export function CreativeStudio({
     // Chọn = pill cam đặc chữ trắng — cùng ngôn ngữ với chấm bước ở rail; chưa
     // chọn = viền mảnh. Hai trạng thái phải khác nhau NGAY cả khi liếc.
     const chip = (on: boolean) =>
-      `rounded-full px-3 py-1.5 text-[11px] font-bold ${
-        on
-          ? "bg-accent text-white shadow-[0_1px_6px_rgba(0,0,0,.35)]"
-          : "text-n400 shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
+      `rounded-full border-2 px-3 py-1.5 text-[11px] font-bold ${
+        on ? "border-pop-ink bg-viol text-white" : "border-pop-ink/15 bg-white text-pop-ink/60"
       }`;
 
     return (
-      <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-3 overflow-auto bg-n900 px-5 pb-6 pt-9 text-n100">
+      // lg phải NỚI trần bề rộng: lưới [1fr,380px] mà wrapper kẹp 600px thì cột
+      // ảnh chỉ còn ~200px — ảnh thành mẩu giữa biển nền trống (đã dính).
+      <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] lg:[&>*]:max-w-[1020px] screen-in scr flex h-full flex-col gap-3 overflow-auto bg-pop-bg px-5 pb-4 pt-5 font-body text-pop-ink">
         <BackBar
           onBack={() => setStep("packs")}
           title={lang === "vi" ? pack.vi : pack.en}
+          dark={false}
         />
 
         {/* Màn rộng: ẢNH bên trái, chỗ dặn AI và tuỳ chọn bên phải. Xếp dọc trên
             màn rộng thì ảnh bị nhét vào một cột hẹp còn điều khiển kéo ngang cả
             nghìn pixel — vừa xấu vừa phải đảo mắt lên xuống mỗi lần chỉnh. */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
+        <div className="flex flex-col gap-3 lg:grid lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
         <div className="flex min-w-0 flex-col gap-3">
 
-        {/* Ảnh đang chọn — to, object-contain để mọi khung đều trọn vẹn */}
-        <div className="relative grid h-[46vh] max-h-[520px] min-h-[300px] flex-none place-items-center overflow-hidden rounded-3xl bg-n800 ring-1 ring-n700 lg:h-[calc(100dvh-360px)]">
-          {selected ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={selected.img.url}
-              alt=""
-              className="h-full w-full object-contain"
-            />
-          ) : generating ? (
-            <Spinner label={t.generating} />
-          ) : null}
-          {selected?.busy ? (
-            <div className="absolute inset-0 grid place-items-center bg-n900/45">
-              <span className="rounded-full bg-n900/85 px-4 py-2 backdrop-blur">
-                <Spinner label={t.refining} />
+        {/* Khung ÔM ẢNH thay vì hộp cố định: ảnh dọc ra thẻ dọc, ảnh vuông ra
+            thẻ vuông — hộp ngang cố định + object-contain từng để ảnh dọc kẹp
+            giữa hai dải mực trống (phản hồi thật). Mọi nút/nhãn neo theo mép
+            ẢNH, không theo mép hộp. */}
+        {selected ? (
+          <div className="grid flex-none place-items-center">
+            <div className="relative overflow-hidden rounded-3xl border-2 border-pop-ink bg-pop-ink shadow-[5px_5px_0_var(--color-pop-ink)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={selected.img.url}
+                alt=""
+                onLoad={(e) => {
+                  const el = e.target as HTMLImageElement;
+                  setDims({ w: el.naturalWidth, h: el.naturalHeight });
+                }}
+                className="block h-auto max-h-[46vh] w-auto max-w-full lg:max-h-[calc(100dvh-380px)]"
+              />
+              {selected.busy ? (
+                <div className="absolute inset-0 grid place-items-center bg-pop-ink/45">
+                  <span className="rounded-full bg-white px-4 py-2 text-pop-ink">
+                    <Spinner label={t.refining} />
+                  </span>
+                </div>
+              ) : null}
+              {!selected.img.unlocked ? (
+                <span className="absolute left-2.5 top-2.5 rounded-full border-2 border-pop-ink bg-sun px-2.5 py-1 text-[10.5px] font-bold text-pop-ink">
+                  Bản xem thử
+                </span>
+              ) : null}
+              {/* Tỉ lệ + kích thước THẬT của file — khách mua ảnh có quyền biết
+                  đang cầm bao nhiêu pixel, và "Nâng 2K" có tác dụng thì thấy số
+                  nhảy ngay tại đây */}
+              {dims && !selected.busy ? (
+                <span className="absolute bottom-2.5 left-2.5 rounded-full border-2 border-pop-ink bg-white px-2.5 py-1 text-[10.5px] font-bold text-pop-ink">
+                  {ratioLabel(dims.w, dims.h)} · {dims.w}×{dims.h}px
+                </span>
+              ) : null}
+              {!selected.busy ? (
+                <div className="absolute bottom-2.5 right-2.5 flex gap-1.5">
+                  <button
+                    onClick={() =>
+                      downloadUrl(selected.img.url, `${pack.id}-${sel + 1}.jpg`)
+                    }
+                    className="rounded-full border-2 border-pop-ink bg-white px-3 py-1.5 text-[11px] font-bold text-pop-ink"
+                  >
+                    {t.downloadOne}
+                  </button>
+                  <button
+                    onClick={() => void refine(sel, { note: "", upscale: true })}
+                    className="rounded-full border-2 border-pop-ink bg-mint px-3 py-1.5 text-[11px] font-bold text-white"
+                  >
+                    {t.upscale2k}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : generating ? (
+          <div
+            className="relative grid h-[46vh] max-h-[520px] min-h-[300px] flex-none place-items-center overflow-hidden rounded-3xl border-2 border-pop-ink text-white shadow-[5px_5px_0_var(--color-pop-ink)]"
+            // Nền là GRADIENT CỦA PACK — vừa đỡ trống vừa nói đang vẽ phong cách nào
+            style={{ background: pack.gradient }}
+          >
+            <div className="flex flex-col items-center gap-2.5">
+              <span className="rounded-full border-2 border-pop-ink bg-white px-4 py-2 text-pop-ink shadow-[3px_3px_0_var(--color-pop-ink)]">
+                <Spinner label={t.generating} />
+              </span>
+              <span className="rounded-full bg-pop-ink/35 px-3 py-1 text-[11px] font-semibold text-white">
+                {t.generatingHint}
               </span>
             </div>
-          ) : null}
-          {selected && !selected.img.unlocked ? (
-            <span className="absolute left-2.5 top-2.5 rounded-full bg-n900/85 px-2.5 py-1 text-[10.5px] font-bold text-a300 backdrop-blur">
-              Bản xem thử
-            </span>
-          ) : null}
-          {selected && !selected.busy ? (
-            <div className="absolute bottom-2.5 right-2.5 flex gap-1.5">
-              <button
-                onClick={() =>
-                  downloadUrl(selected.img.url, `${pack.id}-${sel + 1}.jpg`)
-                }
-                className="rounded-full bg-n900/80 px-3 py-1.5 text-[11px] font-bold text-n100 backdrop-blur"
-              >
-                {t.downloadOne}
-              </button>
-              <button
-                onClick={() => void refine(sel, { note: "", upscale: true })}
-                className="rounded-full bg-n900/80 px-3 py-1.5 text-[11px] font-bold text-g300 backdrop-blur"
-              >
-                {t.upscale2k}
-              </button>
-            </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         {/* Dải chip — CHỈ ảnh đã có thật. Đang tạo lô mới thì không có chip chờ
             xoay vòng: khung to đã nói "đang vẽ" rồi, chip chờ chỉ thêm rối. */}
@@ -291,13 +325,16 @@ export function CreativeStudio({
             {shots.map((shot, i) => (
               <button
                 key={i}
-                onClick={() => setSel(i)}
+                onClick={() => {
+                  setSel(i);
+                  setDims(null);
+                }}
                 className={`relative h-[58px] w-[46px] flex-none overflow-hidden rounded-xl transition-opacity ${
                   i === sel
                     ? // Ring tách khỏi ảnh một khe nền — ôm sát mép là thành viền
                       // dày dính vào ảnh, nhìn "cấn"
-                      "ring-2 ring-accent ring-offset-2 ring-offset-n900"
-                    : "ring-1 ring-n700 opacity-70"
+                      "ring-2 ring-viol ring-offset-2 ring-offset-pop-bg"
+                    : "ring-1 ring-pop-ink/25 opacity-70"
                 } ${shot.busy ? "opacity-35" : ""}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -324,7 +361,7 @@ export function CreativeStudio({
           onChange={(e) => setNote(e.target.value.slice(0, MAX_NOTE_LENGTH))}
           placeholder={t.notePlaceholder}
           rows={2}
-          className="flex-none resize-none rounded-2xl bg-n800 px-3.5 py-2.5 text-[12.5px] text-n100 placeholder:text-n600 outline-none ring-1 ring-n700 focus:ring-accent"
+          className="flex-none resize-none rounded-2xl border-2 border-pop-ink/20 bg-white px-3.5 py-2.5 text-[12.5px] text-pop-ink outline-none placeholder:text-pop-ink/40 focus:border-viol"
         />
         <div className="flex flex-none gap-2">
           {/* Disabled vẫn giữ HÌNH pill, chỉ đổi sang xám — mất hẳn nền thì nút
@@ -332,18 +369,18 @@ export function CreativeStudio({
           <button
             onClick={() => void refine(sel, { note, upscale: false })}
             disabled={!note.trim() || !selected || selected.busy}
-            className="flex-1 rounded-full bg-accent py-2.5 text-[12px] font-bold text-white disabled:bg-n800 disabled:text-n500"
+            className="flex-1 rounded-full border-2 border-pop-ink bg-viol py-2.5 text-[12px] font-bold text-white disabled:border-pop-ink/20 disabled:bg-pop-ink/10 disabled:text-pop-ink/45"
           >
             {t.refineGo}
           </button>
           <button
             onClick={() => photo && void generate(photo, pack, true)}
             disabled={generating || !photo}
-            className="flex-1 rounded-full py-2.5 text-[12px] font-bold text-n200 shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
+            className="flex-1 rounded-full border-2 border-pop-ink bg-white py-2.5 text-[12px] font-bold text-pop-ink"
           >
             {generating ? (
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-n600 border-t-accent" />
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-pop-ink/25 border-t-viol" />
                 {t.generating}
               </span>
             ) : (
@@ -355,14 +392,14 @@ export function CreativeStudio({
         {/* Tuỳ chọn nâng cao — gập mặc định, áp cho lượt kế tiếp */}
         <button
           onClick={() => setShowOpts(!showOpts)}
-          className="flex-none text-left text-[11px] font-semibold text-n500"
+          className="flex-none text-left text-[11px] font-bold text-pop-ink/55"
         >
           {showOpts ? "▾" : "▸"} {t.optionsLabel}
         </button>
         {showOpts ? (
-          <div className="flex flex-none flex-col gap-2.5 rounded-2xl bg-n800/60 p-3">
+          <div className="flex flex-none flex-col gap-2.5 rounded-2xl border-2 border-pop-ink/15 bg-white p-3">
             <div className="flex items-center gap-1.5">
-              <span className="w-[72px] flex-none text-[11px] text-n500">
+              <span className="w-[72px] flex-none text-[11px] font-semibold text-pop-ink/55">
                 {t.aspectLabel}
               </span>
               {ASPECT_CHOICES.map((a) => (
@@ -372,7 +409,7 @@ export function CreativeStudio({
               ))}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-[72px] flex-none text-[11px] text-n500">
+              <span className="w-[72px] flex-none text-[11px] font-semibold text-pop-ink/55">
                 {t.countLabel}
               </span>
               {([2, 4] as const).map((n) => (
@@ -411,13 +448,13 @@ export function CreativeStudio({
         </div>
         </div>
 
-        <div className="mt-auto flex flex-none items-center justify-between gap-2 pt-1 text-[11.5px] font-semibold">
-          <button className="text-a300" onClick={() => setStep("packs")}>
+        <div className="mt-auto flex flex-none items-center justify-between gap-2 pt-2.5 text-[11.5px] font-semibold">
+          <button className="font-bold text-viol" onClick={() => setStep("packs")}>
             {t.changeStyle}
           </button>
           {/* Không xoá gì ở đây — lỡ tay bấm rồi back ra thì ảnh đã tạo vẫn còn.
               Lô cũ chỉ bị thay khi ảnh mới THẬT SỰ được chụp và lô mới về. */}
-          <button className="text-n500" onClick={() => setStep("capture")}>
+          <button className="font-bold text-pop-ink/50" onClick={() => setStep("capture")}>
             {t.newPhoto}
           </button>
         </div>
@@ -427,9 +464,9 @@ export function CreativeStudio({
 
   // ── màn chọn phong cách (đã chốt, giữ nguyên) ─────────────────────────────
   return (
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-n900 px-5 pb-7 pt-9 text-n100">
-      <BackBar onBack={onExit} title={t.flowCreativeTitle} />
-      <p className="-mt-2 text-[12.5px] leading-normal text-n400">
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-4 pt-5 font-body text-pop-ink">
+      <BackBar onBack={onExit} title={t.flowCreativeTitle} dark={false} />
+      <p className="-mt-2 text-[12.5px] leading-normal text-pop-ink/60">
         {t.packsSub}
       </p>
 
@@ -438,7 +475,7 @@ export function CreativeStudio({
           <button
             key={p.id}
             onClick={() => pickPack(p)}
-            className="relative flex flex-col justify-end gap-0.5 overflow-hidden rounded-2xl p-3 text-left ring-1 ring-n700"
+            className="relative flex flex-col justify-end gap-0.5 overflow-hidden rounded-2xl border-2 border-pop-ink p-3 text-left shadow-[3px_3px_0_var(--color-pop-ink)]"
             style={{ background: p.gradient, aspectRatio: "3 / 4" }}
           >
             {/* Ảnh mẫu: người HƯ CẤU do AI tạo (gen-thumbs.mjs). Thiếu file thì
@@ -464,12 +501,12 @@ export function CreativeStudio({
       </div>
 
       {photo ? (
-        <p className="m-0 text-[11px] leading-snug text-g400">{t.packsReuse}</p>
+        <p className="m-0 text-[11px] font-semibold leading-snug text-mint">{t.packsReuse}</p>
       ) : null}
 
       {error ? <ErrorNote>{error}</ErrorNote> : null}
 
-      <p className="mt-auto pt-2 text-[10.5px] leading-snug text-n600">
+      <p className="mt-auto pt-2 text-[10.5px] leading-snug text-pop-ink/50">
         {t.creativeNote}
       </p>
     </div>

@@ -304,12 +304,12 @@ export function Studio() {
     // tối cũ — khung bỏ rồi thì mảng màu mờ cùng tông ở góc đọc ra là vệt lỗi
     // chứ không phải chủ ý (khách chỉ đúng chỗ này). Trang trí là việc của
     // landing; trong app, ảnh của khách là thứ duy nhất được phép nổi.
-    <div className="relative min-h-dvh overflow-x-clip bg-pop-bg px-3 py-4 font-body text-pop-ink sm:px-5 sm:py-6">
+    <div className="relative flex h-dvh flex-col overflow-x-clip bg-pop-bg px-3 py-3 font-body text-pop-ink sm:px-5 sm:py-4">
       {/* KHÔNG nhốt app trong khung điện thoại nữa. Khung 390px cứng làm app
           trông như bản demo và loại thẳng nhóm trả tiền nhiều nhất (tiệm ảnh,
           agency ngồi máy bàn). Giờ: mobile chiếm trọn màn, desktop là một thẻ
           rộng có chiều cao thật. Từng màn tự giới hạn bề rộng đọc được bên trong. */}
-      <div className="relative mx-auto flex w-full max-w-[1120px] flex-col gap-4">
+      <div className="relative mx-auto flex w-full min-h-0 max-w-[1120px] flex-1 flex-col gap-3">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/" className="font-display text-[21px] font-bold leading-none tracking-tight">
             {t.brand}
@@ -335,13 +335,16 @@ export function Studio() {
 
         {rail}
 
-        <main className="relative w-full">
+        <main className="relative min-h-0 w-full flex-1">
           {/* THỬ NGHIỆM không khung: bỏ hộp viền mực — màn sáng (Home) tan thẳng
               vào nền shell như một trang liền mạch; màn tối (Chụp/Kiểm tra/Chỉnh
               sửa) tự thành tấm panel bo góc nổi trên nền sáng, không cần viền đỡ.
               Giữ nguyên cơ chế chiều cao + overflow: các màn thiết kế theo h-full
               và tự cuộn bên trong. */}
-          <div className="h-[calc(100dvh-220px)] min-h-[540px] w-full overflow-hidden rounded-3xl sm:h-[calc(100dvh-200px)]">
+          {/* Cao theo PHẦN CÒN LẠI THẬT (flex-1), không trừ px cứng: header và
+              rail đổi chiều cao theo ngôn ngữ và bề ngang màn — trừ số cố định
+              thì có lúc thiếu, và thiếu là nội dung bị cắt ngang ở đáy. */}
+          <div className="h-full w-full overflow-hidden rounded-3xl">
           {flow === "creative" ? (
             <CreativeStudio t={t} lang={lang} onExit={() => setFlow("id")} />
           ) : null}
