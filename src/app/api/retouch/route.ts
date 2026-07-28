@@ -33,6 +33,7 @@ import {
 } from "@/lib/geometry";
 import { sharpExtend } from "@/lib/render";
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/errors";
 
 import {
   checkGate,
@@ -275,7 +276,6 @@ export async function POST(request: Request) {
     };
     return withClientCookie(NextResponse.json(res), request, gate.clientId);
   } catch (e) {
-    console.error("[api/retouch]", e);
-    return Response.json({ error: (e as Error).message }, { status: 500 });
+    return errorResponse("api/retouch", e);
   }
 }

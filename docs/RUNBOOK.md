@@ -302,14 +302,53 @@ chạm 60s thì model đang chậm bất thường, không phải lỗi cấu h�
 
 Nói thẳng để người tiếp quản không tưởng đã xong:
 
-- **Lỗi vẫn lộ chữ thô của model** ra mặt khách (`"Model không trả về ảnh: Rất
-  tiếc, tôi không thể…"`). Chưa có lớp lỗi có mã.
+- ~~Lỗi lộ chữ thô của model~~ → ĐÃ XONG (29/07/2026): lib/errors.ts — lỗi chủ
+  động mang câu Việt + mã; lỗi lạ chỉ trả câu chung, ruột nằm ở log server.
 - **`vn34` — loại giấy tờ MẶC ĐỊNH — vẫn `verified: false`**, cùng `schen`,
   `vn46`, `exam`. Số đo lấy theo thông lệ, chưa đối chiếu văn bản gốc. Đây là rủi
   ro hoàn tiền thật khi đã thu tiền.
 - **Hai spec chân dung `link` và `profile45` là code chết** — đủ spec và test
   nhưng không còn đường nào vào giao diện sau lần tách luồng.
-- **Đối soát thanh toán thủ công.** Tự động hoá khi nào thấy phiền: đọc API sao kê
-  ngân hàng rồi khớp memo — vẫn không cần cổng thanh toán.
+- ~~Đối soát thanh toán thủ công~~ → ĐÃ XONG (29/07/2026): webhook SePay, xem
+  mục 10. Đường tay qua `/api/admin/mark-paid` vẫn giữ làm dự phòng.
 - **Không có observability**: không request id, không đếm lần gọi model theo thời
   gian, không biết tỉ lệ lỗi. Khi có khách thật thì đây là thứ thiếu đau nhất.
+
+---
+
+## 10. Thanh toán tự động qua SePay
+
+Luồng: khách quét VietQR kèm mã memo → tiền vào tài khoản → SePay bắn webhook →
+app khớp memo + kiểm số tiền → đơn chuyển `paid` → UI khách đang mở tự poll 6s/lần
+thấy paid là mở khoá, không cần bấm gì.
+
+### Cấu hình một lần
+
+1. Tạo tài khoản [sepay.vn](https://sepay.vn), liên kết đúng tài khoản ngân hàng
+   đang nhận tiền (khớp `PHOTO_BANK_CODE`/`PHOTO_BANK_ACCOUNT`).
+2. SePay → Webhooks → thêm webhook:
+   - URL: `https://<domain>/api/webhooks/sepay`
+   - Kiểu xác thực: **Api Key** — sinh một chuỗi ngẫu nhiên dài, dán vào SePay.
+3. Đặt env `PHOTO_SEPAY_API_KEY=<chuỗi đó>` rồi deploy lại.
+
+### Tính chất phải giữ khi sửa
+
+- **Thiếu env / thiếu DB là 503** — webhook không xác thực được thì thà chết.
+  Đây là chốt chống "fail-open": ai đó tự bắn payload đánh dấu đơn mình đã trả.
+- Giao dịch không liên quan (tiền ra, không mã, không đơn) trả **2xx** — trả 4xx
+  là SePay retry mãi một giao dịch không bao giờ khớp.
+- **Thiếu tiền thì KHÔNG mở khoá**, chỉ log (`[webhook/sepay] ... thiếu tiền`) —
+  xử tay: hoàn tiền hoặc nhắn khách chuyển bổ sung rồi `mark-paid`.
+- Phần thuần (tìm memo trong nội dung bẩn, lọc giao dịch) nằm ở `lib/sepay.ts`,
+  có test — sửa cách tìm mã thì sửa ở đó và chạy test, đừng sửa trong route.
+
+### Thử nhanh sau khi cấu hình
+
+```bash
+curl -s -X POST https://<domain>/api/webhooks/sepay \
+  -H "Authorization: Apikey $PHOTO_SEPAY_API_KEY" \
+  -H "content-type: application/json" \
+  -d '{"transferType":"in","transferAmount":49000,"content":"MBVCB.1.ATABC234.test"}'
+# → {"success":true,"ignored":"không có đơn"} nếu mã không khớp đơn nào — nghĩa là
+# xác thực + parse chạy đúng. Sai key phải ra 401; bỏ header phải ra 401.
+```

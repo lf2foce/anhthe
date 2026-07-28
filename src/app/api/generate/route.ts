@@ -19,6 +19,7 @@ import {
 import { decodeDataUrl } from "@/lib/imageio";
 import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
 import { NextResponse } from "next/server";
+import { errorResponse } from "@/lib/errors";
 
 import {
   checkGate,
@@ -148,7 +149,6 @@ export async function POST(request: Request) {
     const res: GenerateResponse = { packId: pack.id, sessionId, images };
     return withClientCookie(NextResponse.json(res), request, gate.clientId);
   } catch (e) {
-    console.error("[api/generate]", e);
-    return Response.json({ error: (e as Error).message }, { status: 500 });
+    return errorResponse("api/generate", e);
   }
 }

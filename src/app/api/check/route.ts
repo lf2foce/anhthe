@@ -16,6 +16,7 @@ import { imageSize } from "@/lib/render";
 import type { PhotoCheck } from "@/lib/checks";
 
 import { checkSize } from "@/lib/gate";
+import { errorResponse } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -74,7 +75,6 @@ export async function POST(request: Request) {
 
     return Response.json(result);
   } catch (e) {
-    console.error("[api/check]", e);
-    return Response.json({ error: (e as Error).message }, { status: 500 });
+    return errorResponse("api/check", e);
   }
 }

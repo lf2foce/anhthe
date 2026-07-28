@@ -11,7 +11,7 @@
  * "Tôi đã chuyển khoản" để hỏi lại trạng thái. Không webhook, không cổng.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createOrder } from "@/lib/api";
 import { formatVnd } from "@/lib/pricing";
 import { ErrorNote, PrimaryButton } from "@/components/ui";
@@ -40,6 +40,29 @@ export function UnlockPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+
+  /**
+   * Tự hỏi lại trạng thái mỗi 6s khi đang chờ tiền — webhook SePay đánh dấu đơn
+   * ở server, còn khách thì đang nhìn mã QR: không poll thì trả tiền xong vẫn
+   * phải tự bấm "Tôi đã chuyển khoản" mới biết. Poll IM LẶNG (không đụng busy)
+   * để nút bấm tay không nhấp nháy theo.
+   */
+  const onUnlockedRef = useRef(onUnlocked);
+  onUnlockedRef.current = onUnlocked;
+  const waiting = order !== null && order.status !== "paid";
+  useEffect(() => {
+    if (!waiting) return;
+    const id = setInterval(async () => {
+      try {
+        const o = await createOrder({ sessionId, planId });
+        setOrder(o);
+        if (o.status === "paid") onUnlockedRef.current();
+      } catch {
+        // mạng chớp — vòng sau thử lại, không báo lỗi vì khách không bấm gì
+      }
+    }, 6000);
+    return () => clearInterval(id);
+  }, [waiting, sessionId, planId]);
 
   async function open() {
     setBusy(true);

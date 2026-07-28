@@ -2,6 +2,7 @@ import "server-only";
 
 import sharp from "sharp";
 import { GoogleGenAI, Type } from "@google/genai";
+import { AppError } from "./errors";
 import type { FaceLandmarks } from "./geometry";
 import { AI_CHECK_IDS, type AiCheckId } from "./checks";
 import type { OutfitId } from "./docs";
@@ -172,13 +173,22 @@ export async function analyzePhoto(image: ImageInput): Promise<PhotoAnalysis> {
   });
 
   const text = res.text;
-  if (!text) throw new Error("Model không trả về nội dung phân tích.");
+  if (!text)
+    throw new AppError(
+      "MODEL_NO_IMAGE",
+      "AI không đọc được ảnh này. Thử lại giúp nhé.",
+      502
+    );
 
   let raw: RawAnalysis;
   try {
     raw = JSON.parse(text) as RawAnalysis;
   } catch {
-    throw new Error("Không đọc được JSON phân tích từ model.");
+    throw new AppError(
+      "MODEL_NO_IMAGE",
+      "AI không đọc được ảnh này. Thử lại giúp nhé.",
+      502
+    );
   }
 
   const known = new Set<string>(AI_CHECK_IDS);
@@ -425,11 +435,14 @@ async function generateImage(opts: {
     }
   }
 
+  // Text từ chối của model là chuyện NỘI BỘ: log để tra, khách nhận câu Việt
+  // gọn — không bao giờ dán lời model thô lên UI.
   const refusal = parts.find((p) => p.text)?.text;
-  throw new Error(
-    refusal
-      ? `Model không trả về ảnh: ${refusal.slice(0, 200)}`
-      : "Model không trả về ảnh nào."
+  if (refusal) console.warn("[gemini] model refused:", refusal.slice(0, 300));
+  throw new AppError(
+    "MODEL_NO_IMAGE",
+    "AI không trả về ảnh cho yêu cầu này. Thử lại giúp nhé.",
+    502
   );
 }
 

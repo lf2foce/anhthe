@@ -138,6 +138,16 @@ export async function sessionPaid(
   return rows.length > 0;
 }
 
+/** Đọc đơn theo mã memo — webhook cần biết GIÁ trước khi đánh dấu đã trả. */
+export async function orderByMemo(memo: string): Promise<Order | null> {
+  if (!sql) return null;
+  const rows = (await sql`
+    SELECT * FROM photo_order WHERE memo = ${memo}
+    ORDER BY created_at DESC LIMIT 1
+  `) as OrderRow[];
+  return rows.length > 0 ? toOrder(rows[0]) : null;
+}
+
 /** Đánh dấu đã nhận tiền. Gọi tay sau khi đối soát sao kê. */
 export async function markPaid(memo: string): Promise<boolean> {
   if (!sql) return false;
