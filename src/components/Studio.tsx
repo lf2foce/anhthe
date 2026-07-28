@@ -21,7 +21,6 @@ import {
   exportBlock,
   exportGroups,
   failedBackgrounds,
-  fileCount,
   headScaleOf,
   originalWorking,
   pendingGroups,
@@ -41,16 +40,7 @@ import { Edit } from "./screens/Edit";
 import { Export } from "./screens/Export";
 import { Done } from "./screens/Done";
 
-export function Studio({
-  imageModel,
-  creativeModel,
-  textModel,
-}: {
-  imageModel: string;
-  /** Model của Studio sáng tạo — bản không-lite, khác model thay nền */
-  creativeModel: string;
-  textModel: string;
-}) {
+export function Studio() {
   const [lang, setLang] = useState<Lang>("vi");
   const [s, setS] = useState<StudioState>(INITIAL);
   /**
@@ -307,18 +297,6 @@ export function Studio({
       </span>
     );
 
-  const modelLine = (
-    <p className="m-0 text-[11px] text-pop-ink/45">
-      {flow === "creative"
-        ? lang === "vi"
-          ? `Studio sáng tạo · vẽ bằng ${creativeModel}`
-          : `Creative studio · drawn by ${creativeModel}`
-        : lang === "vi"
-          ? `${fileCount(s)} tệp sẽ được xuất · sửa ảnh ${imageModel} · chấm ${textModel}`
-          : `${fileCount(s)} files to export · retouch ${imageModel} · grading ${textModel}`}
-    </p>
-  );
-
   return (
     // Shell SÁNG theo ngôn ngữ pop — ý "phòng tối" (khung nâu tối bao quanh)
     // bỏ hẳn: nó nhốt nội dung trong một hộp nặng nề và lệch tông với phần còn
@@ -360,10 +338,12 @@ export function Studio({
         {rail}
 
         <main className="relative w-full">
-          {/* Thẻ sticker thay cho hộp tối: viền mực + bóng lệch cứng — cùng chữ
-              ký với landing/Home. Các màn nền tối bên trong đọc ra là "màn xem
-              ảnh" đặt trên bàn sáng, không còn là cả căn phòng tối. */}
-          <div className="h-[calc(100dvh-220px)] min-h-[540px] w-full overflow-hidden rounded-3xl border-2 border-pop-ink bg-white shadow-[6px_6px_0_var(--color-pop-ink)] sm:h-[calc(100dvh-200px)]">
+          {/* THỬ NGHIỆM không khung: bỏ hộp viền mực — màn sáng (Home) tan thẳng
+              vào nền shell như một trang liền mạch; màn tối (Chụp/Kiểm tra/Chỉnh
+              sửa) tự thành tấm panel bo góc nổi trên nền sáng, không cần viền đỡ.
+              Giữ nguyên cơ chế chiều cao + overflow: các màn thiết kế theo h-full
+              và tự cuộn bên trong. */}
+          <div className="h-[calc(100dvh-220px)] min-h-[540px] w-full overflow-hidden rounded-3xl sm:h-[calc(100dvh-200px)]">
           {flow === "creative" ? (
             <CreativeStudio t={t} lang={lang} onExit={() => setFlow("id")} />
           ) : null}
@@ -498,8 +478,6 @@ export function Studio({
           ) : null}
           </div>
         </main>
-
-        {modelLine}
       </div>
     </div>
   );

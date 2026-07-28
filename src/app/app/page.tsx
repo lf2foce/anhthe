@@ -1,22 +1,15 @@
 import { Studio } from "@/components/Studio";
-import { IMAGE_MODEL, IMAGE_MODEL_HIRES, TEXT_MODEL } from "@/lib/gemini";
 
 /**
  * Studio thật, tách khỏi landing ở `/`.
  *
- * Server component: đọc tên model ở đây rồi truyền xuống, vì lib/gemini là
- * `server-only` và nhãn ở chân trang phải nói đúng model đang chạy thật.
+ * (Nhãn tên model ở chân trang đã bỏ theo redesign — thông tin vận hành,
+ * không phải thông tin của khách — nên page không cần đọc lib/gemini nữa.)
  */
 export const metadata = {
   title: "Ảnh thẻ Studio",
 };
 
 export default function AppPage() {
-  return (
-    <Studio
-      imageModel={IMAGE_MODEL}
-      creativeModel={IMAGE_MODEL_HIRES}
-      textModel={TEXT_MODEL}
-    />
-  );
+  return <Studio />;
 }

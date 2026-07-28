@@ -8,7 +8,6 @@ export interface Copy {
 
   homeKicker: string;
   homeTitle: string;
-  homeSub: string;
   pickTitle: string;
   pickHint: string;
   /** Nhắc ở trang chủ: các cỡ khác thêm sau khi đã ưng ảnh */
@@ -140,8 +139,6 @@ export const COPY: Record<Lang, Copy> = {
 
     homeKicker: "Chụp một lần · đủ mọi cỡ",
     homeTitle: "Ảnh thẻ đúng chuẩn, chụp ngay tại nhà",
-    homeSub:
-      "Bạn chỉ cần một bức tường sáng màu và ánh sáng cửa sổ. Phần quy định để chúng tôi lo.",
     pickTitle: "Bạn cần ảnh cho việc gì?",
     pickHint: "Chọn một loại để canh",
     moreSizesLater:
@@ -274,8 +271,6 @@ export const COPY: Record<Lang, Copy> = {
 
     homeKicker: "Shoot once · every size",
     homeTitle: "Compliant ID photos, taken at home",
-    homeSub:
-      "All you need is a light wall and window light. We will handle the regulations.",
     pickTitle: "What do you need photos for?",
     pickHint: "Pick one to frame for",
     moreSizesLater:

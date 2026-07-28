@@ -47,22 +47,22 @@ export function Home({
   const fileRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[600px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-8 pt-8 font-body text-pop-ink">
-      {/* Bóng bay màu — trang trí thuần CSS như landing */}
-      <div className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 max-w-none rounded-full bg-viol-1" />
-
-      <div className="relative flex flex-col gap-2.5">
+    // Bề ngang theo NỘI DUNG chứ không theo một cột 600px cứng: desktop trước
+    // đây thừa hai mảng trống hai bên còn nội dung thì dồn thành cột hẹp dài.
+    // Không còn bóng bay nội bộ — shell đã có, thêm ở đây thì bị mép container
+    // cắt thành một vệt màu vô nghĩa (đã dính).
+    <div className="[&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[880px] screen-in scr relative flex h-full flex-col gap-4 overflow-auto bg-pop-bg px-5 pb-8 pt-8 font-body text-pop-ink">
+      <div className="flex flex-col gap-2.5">
         <span
           className={`w-fit -rotate-2 rounded-full border-2 border-pop-ink bg-pink px-3 py-1 text-[10.5px] font-bold text-white ${POP}`}
         >
           {t.homeKicker}
         </span>
+        {/* Không lặp lời landing: câu "chỉ cần bức tường sáng..." đã nói ở đó,
+            vào tới đây là lúc LÀM chứ không phải lúc thuyết phục nữa. */}
         <h1 className="font-display text-[32px] font-bold leading-[1.05] tracking-tight">
           {t.homeTitle}
         </h1>
-        <p className="max-w-[34ch] text-[13.5px] leading-normal text-pop-ink/65">
-          {t.homeSub}
-        </p>
       </div>
 
       {/* Hai luồng, chọn TRƯỚC mọi thứ khác: ảnh thẻ (compliance, sửa tối thiểu)
@@ -97,8 +97,12 @@ export function Home({
       </div>
 
       {/* Mỗi loại một THẺ màu; chọn = viền mực + bóng cứng, không phải một chấm
-          radio bé — trên màn chạm, cả thẻ là nút. */}
-      <div className="flex flex-col gap-2.5">
+          radio bé — trên màn chạm, cả thẻ là nút. Màn rộng xếp 2 cột cho danh
+          sách ngắn lại, đỡ phải cuộn mới thấy nút chụp. */}
+      {/* grid-cols-1 TƯỜNG MINH: không khai cột thì track ngầm định là `auto`
+          (min-content) — chip nowrap + từ dài trong tên loại banh thẻ ra 400px
+          trên màn 390 (đo được). grid-cols-* của Tailwind = minmax(0,1fr). */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {docs.map((d, i) => {
           const on = d.id === primary;
           const tint = TINTS[i % TINTS.length];
@@ -141,21 +145,24 @@ export function Home({
         })}
       </div>
 
-      {/* MỘT lời kêu gọi chính, phụ là đường viền */}
+      {/* MỘT lời kêu gọi chính, phụ là đường viền. Màn rộng cho hai nút đứng
+          cạnh nhau — đỡ một tầng cuộn nữa. */}
       <div className="mt-auto flex flex-col gap-2.5 pt-3">
-        <button
-          onClick={onShoot}
-          className={`flex items-center justify-center gap-2.5 rounded-full border-2 border-pop-ink bg-viol py-4 text-[15px] font-bold text-white ${POP}`}
-        >
-          <span className="text-[19px] leading-none">◉</span>
-          {t.ctaShoot}
-        </button>
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="rounded-full border-2 border-pop-ink bg-white py-3 text-[13px] font-bold"
-        >
-          {t.ctaUpload}
-        </button>
+        <div className="flex flex-col gap-2.5 sm:flex-row">
+          <button
+            onClick={onShoot}
+            className={`flex flex-1 items-center justify-center gap-2.5 rounded-full border-2 border-pop-ink bg-viol py-4 text-[15px] font-bold text-white ${POP}`}
+          >
+            <span className="text-[19px] leading-none">◉</span>
+            {t.ctaShoot}
+          </button>
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="rounded-full border-2 border-pop-ink bg-white px-6 py-4 text-[13px] font-bold sm:flex-none"
+          >
+            {t.ctaUpload}
+          </button>
+        </div>
         <span className="text-center text-[11px] leading-snug text-pop-ink/50">
           {t.moreSizesLater}
         </span>
