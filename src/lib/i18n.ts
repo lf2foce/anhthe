@@ -134,7 +134,7 @@ export interface Copy {
 
 export const COPY: Record<Lang, Copy> = {
   vi: {
-    brand: "Phòng tối",
+    brand: "Ảnh thẻ Studio",
     tagline:
       "Chụp một lần cho loại bạn cần, AI kiểm tra tiêu chuẩn, ưng rồi xuất sang mọi cỡ khác.",
 
@@ -268,7 +268,7 @@ export const COPY: Record<Lang, Copy> = {
   },
 
   en: {
-    brand: "Darkroom",
+    brand: "Ảnh thẻ Studio",
     tagline:
       "Shoot once for the type you need, let the AI check the rules, then export every other size.",
 

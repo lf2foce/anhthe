@@ -45,7 +45,7 @@ export default function Landing() {
       {/* ── Thanh trên ──────────────────────────────────────────────────── */}
       <header className="mx-auto flex max-w-[1120px] items-center justify-between px-5 pt-5 sm:px-8">
         <span className="font-display text-[19px] font-bold tracking-tight">
-          Phòng tối
+          Ảnh thẻ Studio
           <span className="pl-1 text-pink">✦</span>
         </span>
         <Link

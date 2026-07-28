@@ -270,19 +270,18 @@ export function Studio({
               key={screen}
               disabled={!enabled}
               onClick={() => patch({ screen, error: null })}
-              className="flex flex-none items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-semibold shadow-[inset_0_0_0_1.5px_var(--color-neutral-800)]"
-              style={{
-                color: on ? "var(--color-neutral-100)" : "var(--color-neutral-500)",
-              }}
+              // Chip kẹo: bước hiện tại = tím đậm nổi hẳn; bước tới được = thẻ
+              // trắng; bước chưa tới = tự mờ nhờ button:disabled toàn cục.
+              className={`flex flex-none items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-[11.5px] font-bold ${
+                on
+                  ? "border-pop-ink bg-viol text-white shadow-[2px_2px_0_var(--color-pop-ink)]"
+                  : "border-pop-ink/15 bg-white text-pop-ink/60"
+              }`}
             >
               <span
-                className="grid h-[18px] w-[18px] place-items-center rounded-full text-[10px] font-bold"
-                style={{
-                  background: on
-                    ? "var(--color-accent)"
-                    : "var(--color-neutral-800)",
-                  color: on ? "#fff" : "var(--color-neutral-400)",
-                }}
+                className={`grid h-[18px] w-[18px] place-items-center rounded-full text-[10px] font-bold ${
+                  on ? "bg-white text-pop-ink" : "bg-pop-ink/10 text-pop-ink/60"
+                }`}
               >
                 {i + 1}
               </span>
@@ -298,10 +297,8 @@ export function Studio({
   const quotaLine =
     quota === null ? null : (
       <span
-        className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-          quota.remaining === 0
-            ? "bg-a900/70 text-a200"
-            : "bg-n800 text-n300"
+        className={`rounded-full border-2 border-pop-ink px-2.5 py-1 text-[11px] font-bold ${
+          quota.remaining === 0 ? "bg-pink-1 text-pink" : "bg-sun-1"
         }`}
       >
         {lang === "vi"
@@ -311,7 +308,7 @@ export function Studio({
     );
 
   const modelLine = (
-    <p className="m-0 text-[11px] text-n600">
+    <p className="m-0 text-[11px] text-pop-ink/45">
       {flow === "creative"
         ? lang === "vi"
           ? `Studio sáng tạo · vẽ bằng ${creativeModel}`
@@ -323,10 +320,13 @@ export function Studio({
   );
 
   return (
-    <div className="relative min-h-dvh bg-n900 px-3 py-4 text-n100 sm:px-5 sm:py-6">
+    // Shell SÁNG theo ngôn ngữ pop — ý "phòng tối" (khung nâu tối bao quanh)
+    // bỏ hẳn: nó nhốt nội dung trong một hộp nặng nề và lệch tông với phần còn
+    // lại của thương hiệu mới.
+    <div className="relative min-h-dvh overflow-x-clip bg-pop-bg px-3 py-4 font-body text-pop-ink sm:px-5 sm:py-6">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-32 -top-40 h-[520px] w-[520px] rounded-full bg-g800 opacity-55 blur-[110px]" />
-        <div className="absolute -bottom-52 -right-36 h-[460px] w-[460px] rounded-full bg-a800 opacity-50 blur-[110px]" />
+        <div className="absolute -left-28 -top-24 h-80 w-80 rounded-full bg-viol-1" />
+        <div className="absolute -bottom-32 -right-24 h-72 w-72 rounded-full bg-sun-1" />
       </div>
 
       {/* KHÔNG nhốt app trong khung điện thoại nữa. Khung 390px cứng làm app
@@ -335,13 +335,9 @@ export function Studio({
           rộng có chiều cao thật. Từng màn tự giới hạn bề rộng đọc được bên trong. */}
       <div className="relative mx-auto flex w-full max-w-[1120px] flex-col gap-4">
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-a300">
-              {t.brand}
-            </span>
-            <span className="font-display text-[22px] font-bold leading-none">
-              Ảnh thẻ Studio
-            </span>
+          <Link href="/" className="font-display text-[21px] font-bold leading-none tracking-tight">
+            {t.brand}
+            <span className="pl-1 text-pink">✦</span>
           </Link>
           <div className="flex items-center gap-1.5">
             {quotaLine}
@@ -349,13 +345,11 @@ export function Studio({
               <button
                 key={code}
                 onClick={() => setLang(code)}
-                className="rounded-full px-3.5 py-1.5 text-[12px] font-semibold shadow-[inset_0_0_0_1.5px_var(--color-neutral-700)]"
-                style={{
-                  color:
-                    lang === code
-                      ? "var(--color-accent-300)"
-                      : "var(--color-neutral-500)",
-                }}
+                className={`rounded-full border-2 px-3.5 py-1.5 text-[12px] font-bold ${
+                  lang === code
+                    ? "border-pop-ink bg-sun"
+                    : "border-pop-ink/15 bg-white text-pop-ink/55"
+                }`}
               >
                 {code === "vi" ? "Tiếng Việt" : "English"}
               </button>
@@ -366,7 +360,10 @@ export function Studio({
         {rail}
 
         <main className="relative w-full">
-          <div className="h-[calc(100dvh-220px)] min-h-[540px] w-full overflow-hidden rounded-3xl bg-n900 shadow-[0_18px_50px_rgba(0,0,0,.4)] ring-1 ring-n800 sm:h-[calc(100dvh-200px)]">
+          {/* Thẻ sticker thay cho hộp tối: viền mực + bóng lệch cứng — cùng chữ
+              ký với landing/Home. Các màn nền tối bên trong đọc ra là "màn xem
+              ảnh" đặt trên bàn sáng, không còn là cả căn phòng tối. */}
+          <div className="h-[calc(100dvh-220px)] min-h-[540px] w-full overflow-hidden rounded-3xl border-2 border-pop-ink bg-white shadow-[6px_6px_0_var(--color-pop-ink)] sm:h-[calc(100dvh-200px)]">
           {flow === "creative" ? (
             <CreativeStudio t={t} lang={lang} onExit={() => setFlow("id")} />
           ) : null}
