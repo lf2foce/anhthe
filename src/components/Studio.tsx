@@ -41,6 +41,18 @@ import { Done } from "./screens/Done";
 
 export function Studio() {
   const [lang, setLang] = useState<Lang>("vi");
+  /**
+   * Nhận ngôn ngữ từ landing qua `?lang=en`.
+   *
+   * Đọc trong effect chứ KHÔNG trong useState initializer: server render ra
+   * "vi" còn client đọc query ra "en" thì lệch cây HTML — React sẽ báo hydration
+   * mismatch và dựng lại cả nhánh. Nhấp một nhịp sang tiếng Anh là cái giá rẻ
+   * hơn nhiều so với đó.
+   */
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("lang");
+    if (q === "en" || q === "vi") setLang(q);
+  }, []);
   const [s, setS] = useState<StudioState>(INITIAL);
   /**
    * Hai luồng tách hẳn: "id" = 6 màn compliance; "creative" = CreativeStudio tự
