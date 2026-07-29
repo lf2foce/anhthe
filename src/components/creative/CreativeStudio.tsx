@@ -158,7 +158,11 @@ export function CreativeStudio({
     );
     try {
       const out = await refineImage({
-        photo: target.img.url,
+        // Gửi KHOÁ, không gửi url: url là link ký có hạn (và là link ngoài
+        // origin) — server nhận url rồi tự fetch là mở cửa SSRF. Nhánh `photo`
+        // chỉ còn cho chế độ dev chưa cấu hình kho, khi đó url CHÍNH LÀ data URL.
+        key: target.img.key,
+        photo: target.img.url.startsWith("data:") ? target.img.url : undefined,
         sessionId,
         ...opts,
       });
@@ -363,6 +367,35 @@ export function CreativeStudio({
         {/* MỘT ô dặn AI cho cả hai việc — vẽ lại ảnh này, hoặc tạo lô mới.
             Cả cụm điều khiển chỉ hiện khi ĐÃ có ảnh: chưa có gì để chỉnh thì
             đừng bày đồ chỉnh ra. */}
+        {/* ẢNH GỐC ĐANG DÙNG — đứng đầu cột điều khiển.
+            Không có nó thì sau vài vòng tạo/đổi phong cách, không còn cách nào
+            biết lô ảnh này sinh từ ảnh nào; khách bấm "Dùng ảnh khác" xong vẫn
+            phải đoán xem app đã nhận ảnh mới chưa. Đặt luôn nút đổi ngay cạnh:
+            câu hỏi và hành động ở cùng một chỗ. */}
+        {photo ? (
+          <div className="flex flex-none items-center gap-2.5 rounded-2xl border-2 border-pop-ink/15 bg-white p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photo}
+              alt=""
+              className="h-[42px] w-[32px] flex-none rounded-md border border-pop-ink/20 object-cover"
+            />
+            <span className="flex-1 text-[11px] font-semibold text-pop-ink/60">
+              {t.sourcePhoto}
+            </span>
+            <button
+              onClick={() => {
+                setSessionId(null);
+                setCapturePass((n) => n + 1);
+                setStep("capture");
+              }}
+              className="flex-none rounded-full border-2 border-pop-ink bg-white px-3 py-1 text-[11px] font-bold"
+            >
+              {t.sourceChange}
+            </button>
+          </div>
+        ) : null}
+
         {shots.length > 0 ? (
         <>
         <textarea

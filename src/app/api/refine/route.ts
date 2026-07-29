@@ -12,7 +12,14 @@
 import { nearestAspectRatio, stylize } from "@/lib/gemini";
 import { MAX_NOTE_LENGTH, buildRefinePrompt } from "@/lib/packs";
 import { decodeDataUrl } from "@/lib/imageio";
-import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
+import {
+  newSessionId,
+  ownsKey,
+  readObject,
+  storeImage,
+  usingObjectStore,
+  type StoredImage,
+} from "@/lib/storage";
 import { imageSize } from "@/lib/render";
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/errors";
@@ -21,6 +28,7 @@ import {
   checkGate,
   checkSize,
   isGateFailure,
+  remainingFor,
   withClientCookie,
 } from "@/lib/gate";
 
@@ -33,6 +41,9 @@ export async function POST(request: Request) {
   if (tooBig) return tooBig.response;
 
   let body: {
+    /** Khoá object của ảnh đang chỉnh — đường CHÍNH khi đã có kho ảnh */
+    key?: string;
+    /** Ảnh dạng data URL — chỉ dùng khi chưa cấu hình kho (dev) */
     photo?: string;
     note?: string;
     upscale?: boolean;
@@ -44,9 +55,25 @@ export async function POST(request: Request) {
     return Response.json({ error: "Body phải là JSON." }, { status: 400 });
   }
 
-  let image;
+  /*
+   * Lấy bytes ảnh đang chỉnh. Ưu tiên KHOÁ: client cầm link ký có hạn chứ không
+   * cầm bytes, và khoá thì kiểm được chủ sở hữu — nhận URL rồi tự fetch là mở
+   * cửa SSRF, còn bắt client tải về rồi gửi lại base64 là đội mấy MB mỗi lượt.
+   *
+   * Đọc clientId bằng `remainingFor` (KHÔNG trừ lượt) trước khi `checkGate`:
+   * trừ tiền cho một yêu cầu sai đầu vào là tính phí việc mình chưa làm.
+   */
+  const { clientId } = await remainingFor(request);
+  let image: { buffer: Buffer; mimeType: string };
   try {
-    image = decodeDataUrl(body.photo);
+    if (typeof body.key === "string" && body.key) {
+      if (!usingObjectStore || !ownsKey(clientId, body.key)) {
+        return Response.json({ error: "Không tìm thấy ảnh." }, { status: 404 });
+      }
+      image = { buffer: await readObject(body.key), mimeType: "image/jpeg" };
+    } else {
+      image = decodeDataUrl(body.photo);
+    }
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 400 });
   }
@@ -68,7 +95,7 @@ export async function POST(request: Request) {
     // Giữ đúng khung của ảnh đang chỉnh — đổi khung là đổi bố cục.
     const size = await imageSize(image.buffer);
     const out = await stylize({
-      image: { data: image.base64, mimeType: image.mimeType },
+      image: { data: image.buffer.toString("base64"), mimeType: image.mimeType },
       prompt: buildRefinePrompt(note, upscale),
       aspectRatio: nearestAspectRatio(size.width, size.height),
       imageSize: upscale ? "2K" : undefined,

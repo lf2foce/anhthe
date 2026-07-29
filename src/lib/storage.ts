@@ -90,6 +90,22 @@ async function put(key: string, body: Buffer): Promise<void> {
   );
 }
 
+/**
+ * Đọc bytes của một object.
+ *
+ * Cần cho vòng chỉnh ảnh: client chỉ cầm LINK KÝ, không cầm bytes. Trước đây
+ * client gửi thẳng `img.url` lên và server `decodeDataUrl` nó — chạy được đúng
+ * lúc CHƯA cấu hình R2 (khi đó url là data URL), và gãy im lặng ngay khi bật
+ * kho thật. Nay client gửi KHOÁ, server tự đọc — và khoá thì kiểm được chủ sở
+ * hữu, còn URL thì không.
+ */
+export async function readObject(key: string): Promise<Buffer> {
+  const res = await client!.send(
+    new GetObjectCommand({ Bucket: bucket!, Key: key })
+  );
+  return Buffer.from(await res.Body!.transformToByteArray());
+}
+
 export async function signedUrl(key: string): Promise<string> {
   return getSignedUrl(
     client!,

@@ -133,7 +133,10 @@ export function generateImages(opts: {
 
 /** Vòng lặp trên một ảnh đã sinh: chỉnh theo ghi chú, hoặc vẽ lại ở 2K */
 export function refineImage(opts: {
-  photo: string;
+  /** Khoá object của ảnh đang chỉnh — server tự đọc bytes từ kho */
+  key: string;
+  /** Ảnh dạng data URL — chỉ có khi chạy dev không cấu hình kho ảnh */
+  photo?: string;
   note: string;
   upscale: boolean;
   sessionId: string | null;
