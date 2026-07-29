@@ -155,6 +155,79 @@ export function Landing({ lang }: { lang: Lang }) {
         </div>
       </section>
 
+      {/* ── Trước / Sau ──────────────────────────────────────────────────────
+          Bằng chứng mạnh nhất của sản phẩm, nên đứng ngay sau hero: một cặp ảnh
+          nói nhanh hơn mọi câu về px và DPI. Hai ảnh là ảnh THẬT do chính app
+          sinh ra (người mẫu hư cấu), bản "sau" cắt bằng đúng phép toán của bước
+          xuất — quảng cáo bằng ảnh dựng tay là hứa thứ mình không giao. */}
+      <section className="px-5 pb-4 sm:px-8">
+        <div className="mx-auto max-w-[1120px] rounded-[36px] border-2 border-pop-ink bg-viol-1 p-6 sm:p-10">
+          <div className="grid items-center gap-8 lg:grid-cols-[1fr_1.05fr] lg:gap-12">
+            <div className="flex flex-col gap-4">
+              <span
+                className={`w-fit -rotate-1 rounded-full border-2 border-pop-ink bg-white px-3 py-1 text-[11px] font-bold ${POP}`}
+              >
+                {c.wowTag}
+              </span>
+              <h2 className="max-w-[16ch] font-display text-[30px] font-bold leading-[1.06] sm:text-[38px]">
+                {c.wowTitle}
+              </h2>
+              <p className="max-w-[46ch] text-[14.5px] leading-relaxed text-pop-ink/70">
+                {c.wowBody}
+              </p>
+              <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                {c.wowSteps.map((step, i) => (
+                  <li key={step} className="flex items-start gap-2.5 text-[13.5px] font-semibold">
+                    <span
+                      className={`mt-px grid h-5 w-5 flex-none place-items-center rounded-full border-2 border-pop-ink text-[10px] font-bold text-white ${CARD_TINTS[i].dot}`}
+                    >
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ul>
+              <p className="m-0 max-w-[46ch] text-[11.5px] leading-snug text-pop-ink/55">
+                {c.wowFinePrint}
+              </p>
+            </div>
+
+            {/* Hai ảnh CÙNG khung, cùng cỡ — lệch cỡ là mắt tự quy đổi thành
+                "ảnh sau đẹp hơn vì to hơn", tức khoe sai chỗ. */}
+            <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-5">
+              {[
+                { src: "/hero-before.jpg", label: c.wowBefore, sub: c.wowBeforeSub, tint: "bg-white", rot: "-rotate-2" },
+                { src: "/hero-after.jpg", label: c.wowAfter, sub: c.wowAfterSub, tint: "bg-mint", rot: "rotate-2" },
+              ].map((it, i) => (
+                <figure key={it.src} className="m-0 flex min-w-0 flex-col gap-2">
+                  <div
+                    className={`overflow-hidden rounded-2xl border-2 border-pop-ink bg-white ${POP} ${it.rot}`}
+                    style={{ aspectRatio: "3 / 4" }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={it.src}
+                      alt={it.label}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <figcaption className="flex flex-col gap-0.5 px-0.5 pt-1">
+                    <span
+                      className={`w-fit rounded-full border-2 border-pop-ink px-2.5 py-0.5 text-[10.5px] font-bold ${it.tint} ${i === 1 ? "text-white" : ""}`}
+                    >
+                      {it.label}
+                    </span>
+                    <span className="text-[10.5px] leading-snug text-pop-ink/55">
+                      {it.sub}
+                    </span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Khác biệt: cái máy ĐO ────────────────────────────────────────── */}
       <section className="px-5 py-14 sm:px-8 lg:py-20">
         <div className="mx-auto max-w-[1120px]">
