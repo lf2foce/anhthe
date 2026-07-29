@@ -71,6 +71,8 @@ export function CreativeStudio({
   const [sel, setSel] = useState(0);
   /** Kích thước thật của ảnh đang xem — đọc từ onLoad, cho chip tỉ lệ */
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  /** Đời của lượt xin ảnh mới — dùng làm `key` để Capture dựng lại sạch */
+  const [capturePass, setCapturePass] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -209,6 +211,11 @@ export function CreativeStudio({
   if (step === "capture") {
     return (
       <Capture
+        // `key` đổi mỗi lần xin ảnh mới: ép React DỰNG LẠI hẳn, kể cả video
+        // element và stream camera. Dựa vào việc nhánh bị huỷ là dựa vào chi
+        // tiết cây render — đổi bố cục một hôm là khung hình đóng băng của
+        // lượt trước ở lại và bị chụp lại thành "ảnh mới".
+        key={capturePass}
         t={t}
         onBack={() => setStep(shots.length > 0 ? "results" : "packs")}
         onPhoto={(src) => {
@@ -249,7 +256,10 @@ export function CreativeStudio({
             giữa hai dải mực trống (phản hồi thật). Mọi nút/nhãn neo theo mép
             ẢNH, không theo mép hộp. */}
         {selected ? (
-          <div className="grid flex-none place-items-center">
+          // Ảnh to + dải chọn nằm CHUNG một khối và canh cùng một mép: tách ra
+          // thì dải chip lệch hẳn sang trái ảnh (ảnh tự canh giữa theo tỉ lệ của
+          // nó, dải thì bám mép cột) — nhìn như hai thành phần rơi cạnh nhau.
+          <div className="flex flex-none flex-col items-center gap-2.5">
             <div className="relative overflow-hidden rounded-3xl border-2 border-pop-ink bg-pop-ink shadow-[5px_5px_0_var(--color-pop-ink)]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -300,6 +310,34 @@ export function CreativeStudio({
                 </div>
               ) : null}
             </div>
+
+            {/* Dải chọn ảnh — chỉ hiện khi có nhiều hơn một, một chip đứng lẻ
+                không phải là lựa chọn nào cả. */}
+            {shots.length > 1 ? (
+              <div className="scr flex max-w-full gap-2 overflow-x-auto px-1 py-1">
+                {shots.map((shot, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setSel(i);
+                      setDims(null);
+                    }}
+                    className={`relative h-[58px] w-[46px] flex-none overflow-hidden rounded-xl transition-opacity ${
+                      i === sel
+                        ? "ring-2 ring-viol ring-offset-2 ring-offset-pop-bg"
+                        : "ring-1 ring-pop-ink/25 opacity-70"
+                    } ${shot.busy ? "opacity-35" : ""}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={shot.img.url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : generating ? (
           <div
@@ -318,35 +356,6 @@ export function CreativeStudio({
           </div>
         ) : null}
 
-        {/* Dải chip — CHỈ ảnh đã có thật. Đang tạo lô mới thì không có chip chờ
-            xoay vòng: khung to đã nói "đang vẽ" rồi, chip chờ chỉ thêm rối. */}
-        {shots.length > 0 ? (
-          <div className="scr -mx-1 flex flex-none gap-2 overflow-x-auto px-1 py-1">
-            {shots.map((shot, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setSel(i);
-                  setDims(null);
-                }}
-                className={`relative h-[58px] w-[46px] flex-none overflow-hidden rounded-xl transition-opacity ${
-                  i === sel
-                    ? // Ring tách khỏi ảnh một khe nền — ôm sát mép là thành viền
-                      // dày dính vào ảnh, nhìn "cấn"
-                      "ring-2 ring-viol ring-offset-2 ring-offset-pop-bg"
-                    : "ring-1 ring-pop-ink/25 opacity-70"
-                } ${shot.busy ? "opacity-35" : ""}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={shot.img.url}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              </button>
-            ))}
-          </div>
-        ) : null}
 
         </div>
 
@@ -452,9 +461,21 @@ export function CreativeStudio({
           <button className="font-bold text-viol" onClick={() => setStep("packs")}>
             {t.changeStyle}
           </button>
-          {/* Không xoá gì ở đây — lỡ tay bấm rồi back ra thì ảnh đã tạo vẫn còn.
-              Lô cũ chỉ bị thay khi ảnh mới THẬT SỰ được chụp và lô mới về. */}
-          <button className="font-bold text-pop-ink/50" onClick={() => setStep("capture")}>
+          {/* Ảnh mới = PHIÊN MỚI. Trước đây chỉ đổi màn và giữ nguyên
+              `sessionId`, nên ảnh sinh từ người/ảnh mới rơi vào đúng thư mục
+              của phiên cũ trên kho: hai lượt khác nhau trộn chung một chỗ, và
+              mọi thứ đọc theo phiên (khôi phục, mở khoá, dọn theo hạn) không
+              còn phân biệt được lượt nào là lượt nào.
+              Ảnh đã tạo KHÔNG bị xoá ở đây — lỡ tay bấm rồi back ra thì lô cũ
+              vẫn còn; nó chỉ bị thay khi lô mới thật sự về. */}
+          <button
+            className="font-bold text-pop-ink/50"
+            onClick={() => {
+              setSessionId(null);
+              setCapturePass((n) => n + 1);
+              setStep("capture");
+            }}
+          >
             {t.newPhoto}
           </button>
         </div>
