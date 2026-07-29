@@ -80,6 +80,24 @@ export const FAMILY_TOOLKIT: Record<DocFamily, AiToolkit> = {
   portrait: { outfit: true, polish: true, hiRes: true },
 };
 
+/**
+ * Loại giấy tờ này có cho phép AI THAY TRANG PHỤC không.
+ *
+ * Đây là ngoại lệ per-spec của `FAMILY_TOOLKIT.id`, và ranh giới KHÔNG phải sở
+ * thích mà là luật của nơi nhận ảnh:
+ *
+ * - Giấy tờ do NHÀ NƯỚC cấp/nhận (visa Mỹ, Schengen, hộ chiếu, hồ sơ thi) cấm
+ *   tường minh việc chỉnh sửa số hoá làm thay đổi diện mạo. Ảnh sửa áo bị phát
+ *   hiện là hồ sơ bị từ chối, và khách mất nhiều hơn tiền mua ảnh.
+ * - Ảnh 3×4 / 4×6 dân dụng (hồ sơ xin việc, sơ yếu lý lịch) KHÔNG có văn bản
+ *   nào — tiệm ảnh sửa áo bằng Photoshop mỗi ngày, và đây chính là thứ khách
+ *   trả tiền để có. Đổi áo ở đây còn giúp tăng tỉ lệ đạt: áo trắng trên nền
+ *   trắng là lỗi hay bị trả nhất.
+ *
+ * Mặc định là KHÔNG cho — thêm loại mới mà quên khai thì nó rơi về phía an toàn.
+ */
+export const OUTFIT_ALLOWED: ReadonlySet<string> = new Set(["vn34", "vn46"]);
+
 export const OUTFITS = [
   { id: "keep", vi: "Giữ nguyên", en: "Keep as is" },
   { id: "shirt", vi: "Sơ mi trắng", en: "White shirt" },
@@ -295,9 +313,12 @@ export function sanitizeRetouch(
   requested: { outfit?: OutfitId; polish?: boolean; hiRes?: boolean }
 ): { outfit: OutfitId; polish: boolean; hiRes: boolean } {
   const toolkit = FAMILY_TOOLKIT[spec.family];
+  // Trang phục có ngoại lệ per-spec; `polish`/`hiRes` thì KHÔNG — làm thon mặt
+  // hay vẽ lại ở 2K là sửa chính khuôn mặt, không loại giấy tờ nào cho.
+  const canOutfit = toolkit.outfit || OUTFIT_ALLOWED.has(spec.id);
   return {
     outfit:
-      toolkit.outfit && isOutfitId(requested.outfit) ? requested.outfit : "keep",
+      canOutfit && isOutfitId(requested.outfit) ? requested.outfit : "keep",
     polish: toolkit.polish && !!requested.polish,
     hiRes: toolkit.hiRes && !!requested.hiRes,
   };

@@ -237,6 +237,8 @@ export async function POST(request: Request) {
       smooth: !!body.smooth,
       evenLighting: !!body.evenLighting,
       fillMargins,
+      // Khoá mặt theo HỌ giấy tờ, không theo cờ nào client gửi.
+      strictFace: spec.family === "id",
       ...applied,
     });
 

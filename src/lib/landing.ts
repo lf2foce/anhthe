@@ -86,15 +86,15 @@ export const LANDING: Record<Lang, LandingCopy> = {
         d: "Sau khi AI thay nền, máy đo lại màu nền của file thành phẩm. AI nói xong không có nghĩa là xong.",
       },
       {
-        t: "Không sửa ảnh giấy tờ",
-        d: "Ảnh thẻ chỉ được thay nền và làm nét. Đổi áo, làm thon mặt là sửa ảnh nhận dạng — chỉ có ở luồng chân dung.",
+        t: "Khuôn mặt là bất khả xâm phạm",
+        d: "Không bao giờ làm thon mặt, đổi biểu cảm hay xoá nốt ruồi. Ảnh 3×4/4×6 được thay áo như ngoài tiệm; visa, hộ chiếu và hồ sơ thi thì khoá cả áo — nơi nhận cấm chỉnh sửa.",
       },
     ],
 
     flow1Tag: "Luồng 1",
     flow1Title: "Ảnh thẻ đúng chuẩn",
     flow1Body:
-      "Chọn loại giấy tờ, chụp một lần. AI chấm 8 tiêu chuẩn, thay nền đúng màu quy định, rồi xuất đủ mọi cỡ bạn cần kèm bản in ghép 10×15 có dấu cắt.",
+      "Chọn loại giấy tờ, chụp một lần. AI chấm 8 tiêu chuẩn, thay nền đúng màu quy định, mặc luôn vest hay sơ mi nếu bạn muốn, rồi xuất đủ mọi cỡ kèm bản in ghép 10×15 có dấu cắt.",
     flow2Tag: "Luồng 2 ✨",
     flow2Title: "Studio sáng tạo",
     flow2Body:
@@ -145,15 +145,15 @@ export const LANDING: Record<Lang, LandingCopy> = {
         d: "After the AI replaces the background, the machine re-measures the colour of the finished file. The AI saying it is done does not make it done.",
       },
       {
-        t: "ID photos stay untouched",
-        d: "ID photos only get a new background and sharpening. Changing clothes or slimming a face edits an identity document — that lives in the portrait flow only.",
+        t: "The face is off limits",
+        d: "Never slims a face, changes an expression or removes a mole. Civilian 3×4/4×6 photos get a wardrobe swap like at a photo shop; visas, passports and exam files keep the clothes too — those authorities forbid retouching.",
       },
     ],
 
     flow1Tag: "Flow 1",
     flow1Title: "Compliant ID photos",
     flow1Body:
-      "Pick a document type, shoot once. The AI grades 8 requirements, replaces the background with the required colour, then exports every size you need plus a 10×15 print sheet with crop marks.",
+      "Pick a document type, shoot once. The AI grades 8 requirements, replaces the background with the required colour, puts you in a suit or shirt if you want, then exports every size plus a 10×15 print sheet with crop marks.",
     flow2Tag: "Flow 2 ✨",
     flow2Title: "Creative studio",
     flow2Body:

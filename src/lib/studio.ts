@@ -15,6 +15,7 @@ import {
   type BackgroundGroup,
   type BackgroundId,
   type DocFamily,
+  type OutfitId,
 } from "./docs";
 import { evaluate, type Compliance, type PhotoCheck } from "./checks";
 import type { FaceLandmarks } from "./geometry";
@@ -80,6 +81,11 @@ export interface StudioState {
    */
   smooth: boolean;
   /**
+   * Trang phục AI mặc cho khách. CHỈ áp cho loại giấy tờ được registry cho phép
+   * (`OUTFIT_ALLOWED`) — server lọc lại lần nữa, client không mở được cửa này.
+   */
+  outfit: OutfitId;
+  /**
    * Làm nét khi xuất file. Tích chập thuần, không gọi model — nên đổi cờ này KHÔNG
    * làm mất bản đã thay nền.
    */
@@ -119,6 +125,7 @@ export const INITIAL: StudioState = {
   brightness: 0,
   headScales: {},
   smooth: true,
+  outfit: "keep",
   sharpen: false,
   retouched: {},
   retouching: false,
@@ -144,7 +151,7 @@ export function headScaleOf(s: StudioState, docId: string): number {
  * cache, nó là hằng số.
  */
 export function variantKey(s: StudioState, bg: BackgroundId): string {
-  return `${bg}/${s.smooth ? "smooth" : "plain"}`;
+  return `${bg}/${s.smooth ? "smooth" : "plain"}/${s.outfit}`;
 }
 
 /** Bản đã chuẩn hoá của nền này Ở BỘ TUỲ CHỌN HIỆN TẠI — thiếu nghĩa là chưa sinh */
@@ -169,8 +176,12 @@ export function nearestWorking(
   s: StudioState,
   bg: BackgroundId
 ): Working | undefined {
+  // Bản "anh em" gần nhất: cùng nền và cùng trang phục, chỉ khác lớp da. Đổi
+  // TRANG PHỤC thì không có anh em nào cả — ảnh mặc áo khác là ảnh khác hẳn,
+  // hiện tạm nó lên là nói dối về thứ khách sắp nhận.
   return (
-    variantOf(s, bg) ?? s.retouched[`${bg}/${s.smooth ? "plain" : "smooth"}`]
+    variantOf(s, bg) ??
+    s.retouched[`${bg}/${s.smooth ? "plain" : "smooth"}/${s.outfit}`]
   );
 }
 

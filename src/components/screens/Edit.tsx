@@ -4,11 +4,14 @@ import { useState } from "react";
 
 import {
   BACKGROUNDS,
+  OUTFITS,
+  OUTFIT_ALLOWED,
   bgHex,
   getDoc,
   type BackgroundGroup,
   type BackgroundId,
   type DocSpec,
+  type OutfitId,
 } from "@/lib/docs";
 import { computeCrop, extendToFit, needsBodyFill } from "@/lib/geometry";
 import type { Copy, Lang } from "@/lib/i18n";
@@ -29,12 +32,14 @@ export function Edit({
   failedBackgrounds,
   brightness,
   headScale,
+  outfit,
   sharpen,
   retouching,
   error,
   onBg,
   onBrightness,
   onHeadScale,
+  onOutfit,
   onSharpen,
   onRetouch,
   onRetryBg,
@@ -59,12 +64,14 @@ export function Edit({
   failedBackgrounds: BackgroundId[];
   brightness: number;
   headScale: number;
+  outfit: OutfitId;
   sharpen: boolean;
   retouching: boolean;
   error: string | null;
   onBg: (id: BackgroundId) => void;
   onBrightness: (v: number) => void;
   onHeadScale: (v: number) => void;
+  onOutfit: (v: OutfitId) => void;
   onSharpen: (v: boolean) => void;
   onRetouch: () => void;
   onRetryBg: () => void;
@@ -241,6 +248,40 @@ export function Edit({
           </div>
 
           <p className="m-0 text-[10.5px] leading-snug text-pop-ink/50">{t.bgRule}</p>
+          </div>
+
+          {/* Trang phục — CHỈ hiện với loại registry cho phép. Ẩn hẳn thay vì
+              hiện rồi khoá: mở một mục ra để nói "không dùng được đâu" là quảng
+              cáo cho thứ mình vừa từ chối bán. */}
+          {OUTFIT_ALLOWED.has(spec.id) ? (
+          <div className="flex flex-col gap-2">
+            <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-pop-ink/45">
+              {t.outfitLabel}
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {OUTFITS.map((o) => {
+                const on = outfit === o.id;
+                return (
+                  <button
+                    key={o.id}
+                    onClick={() => onOutfit(o.id)}
+                    aria-pressed={on}
+                    className={`rounded-full border-2 px-3 py-2 text-[11px] font-bold ${
+                      on ? "border-viol bg-viol-1" : "border-pop-ink/15 bg-pop-bg"
+                    }`}
+                  >
+                    {lang === "vi" ? o.vi : o.en}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="m-0 text-[10.5px] leading-snug text-pop-ink/50">
+              {t.outfitNote}
+            </p>
+          </div>
+          ) : null}
+
+          <div className="flex flex-col gap-2">
 
           {/* Nhóm nền: nói thẳng loại nào ra nền nào, vì đây là chỗ dễ nhận file
               sai nền nhất khi chọn nhiều loại cùng lúc. */}

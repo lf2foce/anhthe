@@ -2,7 +2,7 @@
 
 import type { PhotoCheck } from "./checks";
 import type { FaceLandmarks } from "./geometry";
-import type { BackgroundId } from "./docs";
+import type { BackgroundId, OutfitId } from "./docs";
 import type { Working } from "./studio";
 import type { ExportedFile, ExportGroup } from "@/app/api/export/route";
 import type { StoredImage } from "./storage";
@@ -62,6 +62,8 @@ export function retouchPhoto(opts: {
   background: BackgroundId;
   smooth: boolean;
   evenLighting: boolean;
+  /** Trang phục — server lọc lại theo loại giấy tờ, gửi bừa không mở được */
+  outfit: OutfitId;
 }): Promise<Working> {
   return post<Working>("/api/retouch", opts);
 }

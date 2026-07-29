@@ -22,6 +22,9 @@ function opts(over: Partial<RetouchOptions> = {}): RetouchOptions {
     polish: false,
     hiRes: false,
     fillMargins: false,
+    // Mặc định của helper: ảnh GIẤY TỜ (mặt bị khoá). Test chân dung phải mở
+    // tường minh — đó là ranh giới đắt nhất của file này.
+    strictFace: true,
     ...over,
   };
 }
@@ -36,16 +39,39 @@ describe("sanitizeRetouch — lọc theo họ ở server", () => {
     ).toEqual({ outfit: "keep", polish: false, hiRes: false });
   });
 
-  it("mọi loại giấy tờ tuỳ thân đều bị lọc như nhau", () => {
-    for (const id of ["us", "schen", "vn34", "vn46", "exam"]) {
-      const spec = getDoc(id)!;
-      const applied = sanitizeRetouch(spec, {
+  /**
+   * Ranh giới đổi trang phục KHÔNG phải sở thích mà là luật của nơi nhận ảnh:
+   * giấy tờ do nhà nước cấp/nhận cấm tường minh việc chỉnh sửa số hoá làm đổi
+   * diện mạo; ảnh 3×4/4×6 dân dụng thì không có văn bản nào, và tiệm ảnh sửa áo
+   * mỗi ngày. Đóng băng cả HAI phía — chỉ canh một phía thì một hàm luôn trả
+   * "cấm" (hoặc luôn "cho") cũng xanh.
+   */
+  it("giấy tờ nhà nước: CẤM đổi trang phục", () => {
+    for (const id of ["us", "schen", "vnhc", "exam"]) {
+      const applied = sanitizeRetouch(getDoc(id)!, {
         outfit: "blazer",
         polish: true,
         hiRes: true,
       });
       expect(applied).toEqual({ outfit: "keep", polish: false, hiRes: false });
     }
+  });
+
+  it("ảnh thẻ dân dụng: CHO đổi trang phục, vẫn cấm làm đẹp mặt", () => {
+    for (const id of ["vn34", "vn46"]) {
+      const applied = sanitizeRetouch(getDoc(id)!, {
+        outfit: "blazer",
+        polish: true,
+        hiRes: true,
+      });
+      // Đổi áo được, nhưng `polish`/`hiRes` thì KHÔNG: chúng sửa chính khuôn mặt.
+      expect(applied).toEqual({ outfit: "blazer", polish: false, hiRes: false });
+    }
+  });
+
+  it("loại mới quên khai thì rơi về phía AN TOÀN (không cho đổi áo)", () => {
+    const unknown = { ...getDoc("vn34")!, id: "loai-moi-chua-khai" };
+    expect(sanitizeRetouch(unknown, { outfit: "suit" }).outfit).toBe("keep");
   });
 
   it("ảnh chân dung: cho qua đủ cả ba", () => {
@@ -102,15 +128,15 @@ describe("retouchPrompt — ảnh giấy tờ tuỳ thân", () => {
 
 describe("retouchPrompt — ảnh chân dung", () => {
   it("mặc vest thì có lệnh vest, và KHÔNG còn dòng cấm đổi quần áo", () => {
-    const p = retouchPrompt(opts({ outfit: "suit" }));
+    const p = retouchPrompt(opts({ outfit: "suit", strictFace: false }));
     expect(p.toLowerCase()).toContain("vest tối màu");
     expect(p).not.toContain("KHÔNG đổi quần áo");
     expect(p).toContain("hồ sơ nghề nghiệp");
   });
 
   it("mỗi trang phục ra một lệnh khác nhau", () => {
-    const shirt = retouchPrompt(opts({ outfit: "shirt" }));
-    const blazer = retouchPrompt(opts({ outfit: "blazer" }));
+    const shirt = retouchPrompt(opts({ outfit: "shirt", strictFace: false }));
+    const blazer = retouchPrompt(opts({ outfit: "blazer", strictFace: false }));
     expect(shirt.toLowerCase()).toContain("sơ mi trắng");
     expect(blazer.toLowerCase()).toContain("blazer");
     expect(shirt).not.toEqual(blazer);
@@ -122,9 +148,9 @@ describe("retouchPrompt — ảnh chân dung", () => {
    */
   it("vẫn giữ sàn: không thành người khác, không xoá nốt ruồi, không thon mặt", () => {
     for (const over of [
-      { outfit: "suit" as const },
-      { polish: true },
-      { hiRes: true },
+      { outfit: "suit" as const, strictFace: false },
+      { polish: true, strictFace: false },
+      { hiRes: true, strictFace: false },
     ]) {
       const p = retouchPrompt(opts(over));
       expect(p).toContain("KHÔNG đổi khuôn mặt thành người khác");
@@ -189,5 +215,38 @@ describe("retouchPrompt — phần dùng chung", () => {
     expect(retouchPrompt(opts({ evenLighting: true }))).toContain(
       "Cân bằng ánh sáng"
     );
+  });
+});
+
+describe("ảnh thẻ + đổi trang phục — mặt vẫn bị khoá", () => {
+  /**
+   * Chế độ này là chỗ dễ hỏng nhất trong cả file: nới một chút (cho đổi áo) mà
+   * kéo theo cả gói nới của ảnh chân dung thì khách nhận về ảnh giấy tờ đang
+   * mỉm cười — thứ bị trả ở quầy, và mình chính là người gây ra.
+   */
+  const p = retouchPrompt(opts({ outfit: "suit", strictFace: true }));
+
+  it("có lệnh mặc vest", () => {
+    expect(p.toLowerCase()).toContain("vest tối màu");
+  });
+
+  it("vẫn là ảnh thẻ, KHÔNG nhảy sang chế độ chân dung", () => {
+    expect(p).toContain("ảnh thẻ/hộ chiếu");
+    expect(p).not.toContain("hồ sơ nghề nghiệp");
+  });
+
+  it("giữ nguyên các lệnh cấm về KHUÔN MẶT", () => {
+    expect(p).toContain("không đổi biểu cảm");
+    expect(p).toContain("không thêm nụ cười");
+    expect(p).toContain("KHÔNG làm thon mặt");
+    expect(p).toContain("KHÔNG đổi cân nặng");
+  });
+
+  it("chỉ bỏ đúng dòng cấm đổi quần áo, và chốt ranh giới ở ĐƯỜNG CỔ", () => {
+    expect(p).not.toContain("KHÔNG đổi quần áo");
+    expect(p).toContain("TỪ ĐƯỜNG CỔ TRỞ XUỐNG");
+    // Những thứ khác trong cùng dòng cũ không được mất theo
+    expect(p).toContain("KHÔNG thêm trang sức");
+    expect(p).toContain("không xoá nốt ruồi");
   });
 });

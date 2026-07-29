@@ -215,6 +215,7 @@ export function Studio({ initialLang = "vi" }: { initialLang?: Lang }) {
           headScale: headScaleOf(s, s.primary),
           background: group.background,
           smooth: s.smooth,
+          outfit: s.outfit,
           evenLighting,
         });
         // GHÉP vào cache đang có, không thay cả cụm: thay cả cụm bằng bản chụp
@@ -445,6 +446,7 @@ export function Studio({ initialLang = "vi" }: { initialLang?: Lang }) {
               failedBackgrounds={failed}
               brightness={s.brightness}
               headScale={headScaleOf(s, editSpec.id)}
+              outfit={s.outfit}
               sharpen={s.sharpen}
               retouching={s.retouching}
               error={s.error}
@@ -460,6 +462,10 @@ export function Studio({ initialLang = "vi" }: { initialLang?: Lang }) {
               }
               // Làm nét chạy lúc xuất file, không phải lúc thay nền — nên chỉ cần
               // bỏ `files` đã dựng, giữ nguyên bản đã thay nền.
+              // Đổi trang phục là đổi LỆNH gửi model → một version khác trong
+              // cache. Không xoá gì: quay lại "Giữ nguyên" là bản cũ hiện lại
+              // ngay, không tốn thêm lượt nào.
+              onOutfit={(outfit) => patch({ outfit, files: null })}
               onSharpen={(sharpen) => patch({ sharpen, files: null })}
               onRetouch={() => runRetouch(pending)}
               onRetryBg={() =>

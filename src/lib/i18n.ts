@@ -45,6 +45,9 @@ export interface Copy {
   sectionFormat: string;
   sectionExtra: string;
   bgLabel: string;
+  /** Chọn trang phục AI mặc — chỉ hiện với loại giấy tờ cho phép */
+  outfitLabel: string;
+  outfitNote: string;
   /** Giải thích vì sao có nền không bấm được */
   bgRule: string;
   bright: string;
@@ -180,6 +183,9 @@ export const COPY: Record<Lang, Copy> = {
     sectionFormat: "Căn đúng chuẩn giấy tờ",
     sectionExtra: "Làm đẹp thêm (tuỳ chọn)",
     bgLabel: "Nền ảnh",
+    outfitLabel: "Trang phục",
+    outfitNote:
+      "AI mặc áo mới từ cổ trở xuống — mặt, tóc và biểu cảm giữ nguyên tuyệt đối. Chỉ có ở ảnh thẻ dân dụng; visa, hộ chiếu và hồ sơ thi cấm chỉnh sửa nên không mở mục này.",
     bgRule: "Chuẩn giấy tờ quyết định màu nền — màu không được phép sẽ tự khoá.",
     bright: "Độ sáng",
     headRatio: "Tỉ lệ đầu",
@@ -316,6 +322,9 @@ export const COPY: Record<Lang, Copy> = {
     sectionFormat: "Match the document format",
     sectionExtra: "Optional touch-ups",
     bgLabel: "Background",
+    outfitLabel: "Outfit",
+    outfitNote:
+      "The AI swaps clothing from the neckline down — face, hair and expression stay untouched. Civilian ID photos only; visas, passports and exam files forbid retouching so this is hidden there.",
     bgRule: "The document standard decides the background — forbidden colours are locked.",
     bright: "Brightness",
     headRatio: "Head size",

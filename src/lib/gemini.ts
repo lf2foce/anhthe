@@ -279,6 +279,15 @@ export interface RetouchOptions {
    * phần nới đó. Bật khi ảnh gốc quá hẹp so với khung giấy tờ.
    */
   fillMargins: boolean;
+  /**
+   * Khuôn mặt là KHÔNG ĐỤNG ĐƯỢC (ảnh giấy tờ tuỳ thân).
+   *
+   * Tách hẳn khỏi `outfit` vì hai thứ này từng bị dính làm một: cho đổi áo là
+   * prompt tự nhảy sang chế độ chân dung và nới luôn cả biểu cảm, nụ cười, nốt
+   * ruồi. Trên ảnh thẻ thì đổi áo là chuyện tiệm ảnh làm hằng ngày, còn đổi
+   * biểu cảm là sửa ảnh nhận dạng — hai mức hoàn toàn khác nhau.
+   */
+  strictFace: boolean;
 }
 
 /**
@@ -310,7 +319,15 @@ export function retouchPrompt(o: RetouchOptions): string {
     jobs.unshift(
       "Ảnh này đã được nới rộng khung: quanh mép có dải nền phẳng trống. Vẽ TIẾP phần thân và vai của chính người này vào dải trống đó cho liền mạch tự nhiên, như thể ảnh vốn được chụp lùi xa hơn. Phần đã có sẵn giữ NGUYÊN, không vẽ lại, không xê dịch."
     );
-  if (o.outfit !== "keep") jobs.push(OUTFIT_PROMPT[o.outfit]);
+  if (o.outfit !== "keep") {
+    jobs.push(OUTFIT_PROMPT[o.outfit]);
+    if (o.strictFace)
+      // Ảnh giấy tờ: nói rõ ranh giới ĐƯỜNG CỔ. Không có câu này thì model hay
+      // "chỉnh cho hợp bộ đồ" — sửa tóc, sửa hàm, thêm nụ cười tự tin.
+      jobs.push(
+        "Việc thay trang phục chỉ được đụng tới phần TỪ ĐƯỜNG CỔ TRỞ XUỐNG. Đầu, mặt, tóc, tai, cổ và da giữ y NGUYÊN từng chi tiết. Đường tiếp giáp giữa cổ và cổ áo phải liền mạch tự nhiên."
+      );
+  }
   if (o.polish)
     jobs.push(
       "Chỉnh sáng cho da đều màu và mắt trong hơn một chút. KHÔNG đổi hình dáng mắt, mũi, miệng hay đường viền mặt."
@@ -320,7 +337,9 @@ export function retouchPrompt(o: RetouchOptions): string {
       "Xuất ở độ phân giải cao nhất có thể, chi tiết rõ và sạch nhiễu, không làm ảnh trông như vẽ lại."
     );
 
-  const portraitMode = o.outfit !== "keep" || o.polish || o.hiRes;
+  // Chế độ do LOẠI GIẤY TỜ quyết (`strictFace`), không suy ra từ các cờ đang
+  // bật — suy ra thì bật một cờ vô hại là nới luôn cả những ràng buộc khác.
+  const portraitMode = !o.strictFace;
 
   // Sàn chung cho CẢ HAI chế độ: ảnh phải vẫn là người đó.
   const limits = [
@@ -339,7 +358,11 @@ export function retouchPrompt(o: RetouchOptions): string {
     // Chỉ ảnh giấy tờ tuỳ thân mới bị siết mấy điều này.
     limits.push(
       "KHÔNG làm thon mặt, không mở to mắt, không đổi biểu cảm, không thêm nụ cười.",
-      "KHÔNG đổi quần áo, không thêm trang sức, không xoá nốt ruồi hay sẹo.",
+      // Cấm đổi áo CHỈ khi không ai xin đổi — loại giấy tờ nào được phép đổi là
+      // do registry quyết (OUTFIT_ALLOWED), không phải do prompt đoán.
+      o.outfit === "keep"
+        ? "KHÔNG đổi quần áo, không thêm trang sức, không xoá nốt ruồi hay sẹo."
+        : "KHÔNG thêm trang sức, không xoá nốt ruồi hay sẹo, không đổi kiểu tóc.",
       "KHÔNG đổi cân nặng hay hình dáng cơ thể."
     );
   } else {
