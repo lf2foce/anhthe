@@ -122,17 +122,23 @@ export function Studio({ initialLang = "vi" }: { initialLang?: Lang }) {
   const groups = retouchGroups(s);
   const pending = pendingGroups(s);
   const fit = compliance(s);
-  /*
-   * Màn Xuất chỉ liệt kê loại CÙNG CHẾ ĐỘ với loại chính.
-   *
-   * Loại khác chế độ dù sao cũng phải chuẩn hoá riêng một lượt (ảnh dân dụng
-   * được mặc vest, ảnh chính thức thì cấm mọi chỉnh sửa), nên bày chúng ra chỉ
-   * để nói "chọn thì tốn thêm một lượt" là mời khách vào một ngã rẽ mà họ gần
-   * như không bao giờ muốn: ai làm visa thì làm visa, không kèm ảnh 3×4 xin
-   * việc trong cùng một lượt. Muốn cả hai thì chụp lại từ trang chủ — rõ ràng
-   * hơn là trộn trong một màn.
+  /**
+   * TRANG CHỦ: ĐỦ mọi loại — đây là chỗ khách nói mình cần ảnh cho việc gì, cắt
+   * bớt ở đây là cắt mất cả nhu cầu của họ.
    */
-  const idDocs = docsOf("id").filter(
+  const idDocs = docsOf("id");
+
+  /**
+   * MÀN XUẤT: chỉ loại CÙNG CHẾ ĐỘ với loại chính.
+   *
+   * Loại khác chế độ dù sao cũng phải chuẩn hoá riêng một lượt (dân dụng được
+   * mặc vest, chính thức cấm mọi chỉnh sửa), nên bày ra kèm "chọn thì tốn thêm
+   * một lượt" là mời khách vào ngã rẽ họ gần như không bao giờ muốn.
+   *
+   * HAI danh sách tách hẳn nhau: gộp làm một biến rồi lọc là bóp luôn Trang chủ
+   * xuống còn hai loại — đã dính đúng một commit.
+   */
+  const exportDocs = idDocs.filter(
     (d) => regimeOf(d.id) === regimeOf(editSpec.id)
   );
 
@@ -506,7 +512,7 @@ export function Studio({ initialLang = "vi" }: { initialLang?: Lang }) {
               workingFor={(docId) => workingFor(s, docId) ?? original}
               backgroundFor={(spec) => resolveBackground(spec, s.bgPref)}
               headScaleOf={(docId) => headScaleOf(s, docId)}
-              docs={idDocs}
+              docs={exportDocs}
               primary={s.primary}
               picked={s.picked}
               onToggle={toggleDoc}
