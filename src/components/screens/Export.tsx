@@ -5,6 +5,7 @@ import {
   bgHex,
   getDoc,
   pxLabel,
+  regimeOf,
   type BackgroundId,
   type DocSpec,
 } from "@/lib/docs";
@@ -103,11 +104,16 @@ export function Export({
    * được visa Mỹ". Trả lời nằm ở cấu trúc: tick loại khác nền là bước sang nhóm
    * khác, và nhóm đó nói ngay trên đầu là đã có ảnh hay cần thêm một lượt.
    */
-  const groups = BACKGROUNDS.map((b) => ({
-    bg: b,
-    ready: readyBackgrounds.includes(b.id),
-    docs: docs.filter((d) => backgroundFor(d) === b.id),
-  }))
+  const groups = BACKGROUNDS.flatMap((b) =>
+    (["civil", "official"] as const).map((regime) => ({
+      bg: b,
+      regime,
+      ready: readyBackgrounds.includes(b.id),
+      docs: docs.filter(
+        (d) => backgroundFor(d) === b.id && regimeOf(d.id) === regime
+      ),
+    }))
+  )
     .filter((g) => g.docs.length > 0)
     // Nhóm của loại chính đứng đầu — đó là ảnh khách vừa nhìn thấy.
     .sort((a, b) =>
@@ -131,7 +137,7 @@ export function Export({
       </p>
       <div className="flex flex-col gap-4">
         {groups.map((g) => (
-          <div key={g.bg.id} className="flex flex-col">
+          <div key={`${g.bg.id}/${g.regime}`} className="flex flex-col">
             {/* Đầu nhóm: nền nào, và tick vào đây thì được gì — ảnh có sẵn hay
                 tốn thêm một lượt. Nói TRƯỚC khi tick, không phải sau. */}
             <div className="flex items-center gap-2 border-b-2 border-pop-ink/15 pb-1.5">
@@ -140,7 +146,9 @@ export function Export({
                 style={{ background: g.bg.hex }}
               />
               <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-pop-ink/60">
-                {lang === "vi" ? `Nền ${g.bg.vi.toLowerCase()}` : `${g.bg.en} background`}
+                {lang === "vi"
+                  ? `Nền ${g.bg.vi.toLowerCase()} · ${g.regime === "civil" ? "dân dụng" : "chính thức"}`
+                  : `${g.bg.en} · ${g.regime === "civil" ? "civilian" : "official"}`}
               </span>
               <span
                 className={`ml-auto text-[10px] font-semibold ${

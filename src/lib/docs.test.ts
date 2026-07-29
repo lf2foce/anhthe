@@ -103,11 +103,27 @@ describe("resolveBackground", () => {
 });
 
 describe("groupByBackground", () => {
-  it("giấy tờ tuỳ thân gộp về một nhóm nền trắng — một lần gọi model", () => {
-    const groups = groupByBackground(["us", "schen", "vn34", "exam"], null);
+  it("cùng nền + cùng chế độ thì gộp — một lần gọi model", () => {
+    const groups = groupByBackground(["us", "schen", "exam"], null);
     expect(groups).toHaveLength(1);
     expect(groups[0].background).toBe("white");
-    expect(groups[0].docIds).toEqual(["us", "schen", "vn34", "exam"]);
+    expect(groups[0].regime).toBe("official");
+    expect(groups[0].docIds).toEqual(["us", "schen", "exam"]);
+  });
+
+  /**
+   * Bug đã dựng lại được trước khi sửa: 3×4 (được mặc vest) và Visa Mỹ (cấm
+   * chỉnh sửa số hoá) đều ra nền trắng, gộp một nhóm nên dùng CHUNG một tấm
+   * ảnh — tấm ảnh mặc vest đi thẳng vào hồ sơ visa.
+   */
+  it("cùng nền nhưng KHÁC chế độ thì TÁCH — không dùng chung tấm ảnh", () => {
+    const groups = groupByBackground(["vn34", "us"], "white");
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.regime)).toEqual(["civil", "official"]);
+    expect(groups.find((g) => g.regime === "civil")?.docIds).toEqual(["vn34"]);
+    expect(groups.find((g) => g.regime === "official")?.docIds).toEqual(["us"]);
+    // Cùng màu nền — nghĩa là tách KHÔNG phải nhờ màu, mà nhờ chế độ.
+    expect(new Set(groups.map((g) => g.background))).toEqual(new Set(["white"]));
   });
 
   it("thêm LinkedIn là thành hai nhóm, vì nền khác nhau", () => {

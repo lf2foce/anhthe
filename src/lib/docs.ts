@@ -98,6 +98,24 @@ export const FAMILY_TOOLKIT: Record<DocFamily, AiToolkit> = {
  */
 export const OUTFIT_ALLOWED: ReadonlySet<string> = new Set(["vn34", "vn46"]);
 
+/**
+ * CHẾ ĐỘ CHUẨN của một loại giấy tờ — quyết định ảnh nào được dùng chung.
+ *
+ * Đây CHÍNH LÀ ranh giới của `OUTFIT_ALLOWED`, gọi tên ra vì nó còn quyết định
+ * một chuyện lớn hơn: hai loại KHÁC chế độ không được dùng chung một ảnh đã
+ * chuẩn hoá, kể cả khi trùng màu nền.
+ *
+ * Vì sao: một tấm ảnh chuẩn hoá mang theo cả những sửa đổi đã áp lên nó. Ảnh
+ * 3×4 mặc vest và ảnh visa Mỹ có thể cùng nền trắng, nhưng nếu gộp nhóm thì
+ * tấm ảnh mặc vest kia đi thẳng vào hồ sơ visa — nơi cấm chỉnh sửa số hoá. Đã
+ * dựng lại được ca này trước khi sửa.
+ */
+export type DocRegime = "civil" | "official";
+
+export function regimeOf(specId: string): DocRegime {
+  return OUTFIT_ALLOWED.has(specId) ? "civil" : "official";
+}
+
 export const OUTFITS = [
   { id: "keep", vi: "Giữ nguyên", en: "Keep as is" },
   { id: "shirt", vi: "Sơ mi trắng", en: "White shirt" },
@@ -310,12 +328,21 @@ export function familyOf(docId: string): DocFamily {
  */
 export function sanitizeRetouch(
   spec: DocSpec,
-  requested: { outfit?: OutfitId; polish?: boolean; hiRes?: boolean }
+  requested: { outfit?: OutfitId; polish?: boolean; hiRes?: boolean },
+  /**
+   * MỌI loại sẽ dùng chung tấm ảnh này. Lọc theo loại KHẮT KHE NHẤT trong nhóm,
+   * không theo loại chính: ảnh 3×4 mặc vest và visa Mỹ có thể cùng nền trắng,
+   * và nếu chỉ lọc theo loại chính thì tấm ảnh mặc vest đi thẳng vào hồ sơ visa.
+   */
+  alsoUsedBy: DocSpec[] = []
 ): { outfit: OutfitId; polish: boolean; hiRes: boolean } {
   const toolkit = FAMILY_TOOLKIT[spec.family];
   // Trang phục có ngoại lệ per-spec; `polish`/`hiRes` thì KHÔNG — làm thon mặt
   // hay vẽ lại ở 2K là sửa chính khuôn mặt, không loại giấy tờ nào cho.
-  const canOutfit = toolkit.outfit || OUTFIT_ALLOWED.has(spec.id);
+  const everyone = [spec, ...alsoUsedBy];
+  const canOutfit =
+    everyone.every((d) => FAMILY_TOOLKIT[d.family].outfit) ||
+    everyone.every((d) => OUTFIT_ALLOWED.has(d.id));
   return {
     outfit:
       canOutfit && isOutfitId(requested.outfit) ? requested.outfit : "keep",
@@ -380,6 +407,8 @@ export function allowedBackgrounds(docIds: string[]): BackgroundId[] {
 export interface BackgroundGroup {
   background: BackgroundId;
   hex: string;
+  /** Chế độ chuẩn — hai nhóm cùng nền khác chế độ là HAI lần chuẩn hoá */
+  regime: DocRegime;
   docIds: string[];
 }
 
@@ -394,20 +423,32 @@ export function groupByBackground(
   docIds: string[],
   pref: BackgroundId | null
 ): BackgroundGroup[] {
-  const groups = new Map<BackgroundId, string[]>();
+  // Khoá nhóm là NỀN + CHẾ ĐỘ, không phải nền không: cùng nền trắng nhưng khác
+  // chế độ thì vẫn phải là hai lần chuẩn hoá riêng — xem `regimeOf`.
+  const groups = new Map<string, { bg: BackgroundId; regime: DocRegime; ids: string[] }>();
   for (const id of docIds) {
     const spec = getDoc(id);
     if (!spec) continue;
     const bg = resolveBackground(spec, pref);
-    const list = groups.get(bg);
-    if (list) list.push(id);
-    else groups.set(bg, [id]);
+    const regime = regimeOf(spec.id);
+    const key = `${bg}/${regime}`;
+    const found = groups.get(key);
+    if (found) found.ids.push(id);
+    else groups.set(key, { bg, regime, ids: [id] });
   }
-  return BACKGROUNDS.filter((b) => groups.has(b.id)).map((b) => ({
-    background: b.id,
-    hex: b.hex,
-    docIds: groups.get(b.id) ?? [],
-  }));
+  // Thứ tự ổn định: theo thứ tự nền trong bảng, chế độ dân dụng trước.
+  const order: DocRegime[] = ["civil", "official"];
+  return BACKGROUNDS.flatMap((b) =>
+    order
+      .map((r) => groups.get(`${b.id}/${r}`))
+      .filter((g): g is NonNullable<typeof g> => !!g)
+      .map((g) => ({
+        background: g.bg,
+        hex: b.hex,
+        regime: g.regime,
+        docIds: g.ids,
+      }))
+  );
 }
 
 /** Các họ có mặt trong tập giấy tờ đang chọn */

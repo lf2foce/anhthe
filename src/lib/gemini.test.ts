@@ -250,3 +250,29 @@ describe("ảnh thẻ + đổi trang phục — mặt vẫn bị khoá", () => {
     expect(p).toContain("không xoá nốt ruồi");
   });
 });
+
+describe("lọc theo TOÀN NHÓM — ảnh dùng chung phải theo loại khắt khe nhất", () => {
+  /**
+   * Ca đã dựng lại được: tick 3×4 (được mặc vest) cùng Visa Mỹ (cấm chỉnh sửa),
+   * cả hai ra nền trắng. Lọc theo mỗi loại CHÍNH thì tấm ảnh mặc vest được dùng
+   * cho cả hồ sơ visa. Đây là chốt thứ hai, độc lập với việc tách nhóm.
+   */
+  it("nhóm có một loại cấm đổi áo thì CẢ NHÓM không được đổi", () => {
+    const applied = sanitizeRetouch(getDoc("vn34")!, { outfit: "suit" }, [
+      getDoc("us")!,
+    ]);
+    expect(applied.outfit).toBe("keep");
+  });
+
+  it("cả nhóm đều được phép thì vẫn cho đổi", () => {
+    const applied = sanitizeRetouch(getDoc("vn34")!, { outfit: "suit" }, [
+      getDoc("vn46")!,
+    ]);
+    expect(applied.outfit).toBe("suit");
+  });
+
+  it("không truyền nhóm thì xử như chỉ có mình loại đó — không nới thêm gì", () => {
+    expect(sanitizeRetouch(getDoc("us")!, { outfit: "suit" }).outfit).toBe("keep");
+    expect(sanitizeRetouch(getDoc("vn34")!, { outfit: "suit" }).outfit).toBe("suit");
+  });
+});

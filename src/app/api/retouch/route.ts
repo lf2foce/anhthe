@@ -104,8 +104,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // Lọc theo họ: ảnh giấy tờ tuỳ thân không mở vest / làm đẹp / upscale sinh ảnh.
-  const applied = sanitizeRetouch(spec, body);
+  /*
+   * Lọc theo TOÀN NHÓM, không theo mỗi loại chính.
+   *
+   * Tấm ảnh này sẽ được dùng chung cho mọi loại trong `docIds`. Lọc theo loại
+   * chính thôi thì khách tick 3×4 (được mặc vest) cùng Visa Mỹ (cấm chỉnh sửa),
+   * hai loại cùng nền trắng, và tấm ảnh mặc vest đi thẳng vào hồ sơ visa. Đã
+   * dựng lại được ca đó trước khi sửa.
+   */
+  const groupSpecs = (Array.isArray(body.docIds) ? body.docIds : [])
+    .map((id) => getDoc(String(id)))
+    .filter((d): d is NonNullable<ReturnType<typeof getDoc>> => !!d);
+  const applied = sanitizeRetouch(spec, body, groupSpecs);
 
   // 2 lượt: một lần sinh ảnh, một lần chấm lại landmark trên ảnh vừa sinh.
   const gate = await checkGate(request, 2);
