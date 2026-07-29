@@ -165,18 +165,42 @@ export async function saveSessionFiles(
   `;
 }
 
+/**
+ * Số ngày ảnh còn sống trên kho.
+ *
+ * PHẢI KHỚP lifecycle rule của bucket R2. Bản ghi trong Postgres không tự biết
+ * object đã bị R2 dọn hay chưa, nên nếu hai con số lệch nhau thì khôi phục phiên
+ * sẽ trả về một loạt link trỏ vào ảnh đã xoá — và người gặp cảnh đó thường là
+ * khách ĐÃ TRẢ TIỀN quay lại sau vài ngày. Thà nói "đã hết hạn" còn hơn đưa
+ * link chết.
+ */
+export const RETENTION_DAYS = Number(process.env.PHOTO_RETENTION_DAYS ?? 7);
+
+export interface SessionRecovery {
+  sessionId: string;
+  files: unknown;
+  /** Ảnh đã quá hạn lưu — bản ghi còn nhưng object trên kho coi như đã bị dọn */
+  expired: boolean;
+}
+
 /** Đọc lại phiên xuất gần nhất của khách này — nguồn cho việc khôi phục sau F5 */
 export async function latestSession(
   clientId: string
-): Promise<{ sessionId: string; files: unknown } | null> {
+): Promise<SessionRecovery | null> {
   if (!sql) return null;
   const rows = (await sql`
-    SELECT session_id, files FROM photo_session
+    SELECT session_id, files,
+           created_at < now() - (${RETENTION_DAYS} || ' days')::interval AS expired
+    FROM photo_session
     WHERE client_id = ${clientId}
     ORDER BY created_at DESC LIMIT 1
-  `) as Array<{ session_id: string; files: unknown }>;
+  `) as Array<{ session_id: string; files: unknown; expired: boolean }>;
   return rows.length > 0
-    ? { sessionId: rows[0].session_id, files: rows[0].files }
+    ? {
+        sessionId: rows[0].session_id,
+        files: rows[0].files,
+        expired: rows[0].expired,
+      }
     : null;
 }
 

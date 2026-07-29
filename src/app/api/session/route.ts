@@ -11,7 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { remainingFor, withClientCookie } from "@/lib/gate";
-import { latestSession, sessionPaid } from "@/lib/orders";
+import { RETENTION_DAYS, latestSession, sessionPaid } from "@/lib/orders";
 import { ownsKey, signedUrl, usingObjectStore } from "@/lib/storage";
 import type { ExportedFile } from "@/app/api/export/route";
 
@@ -28,8 +28,28 @@ export async function GET(request: Request) {
     );
   }
 
-  const files = found.files as ExportedFile[];
   const paid = await sessionPaid(clientId, found.sessionId);
+
+  /*
+   * Quá hạn lưu: KHÔNG trả file. Bản ghi còn trong Postgres nhưng object trên R2
+   * đã bị lifecycle rule dọn, nên ký link ra chỉ được một loạt ảnh vỡ. Trả cờ
+   * `expired` để UI nói thẳng, và trả kèm `paid` để người ĐÃ TRẢ TIỀN có bằng
+   * chứng mà liên hệ đòi lại.
+   */
+  if (found.expired) {
+    return withClientCookie(
+      NextResponse.json({
+        session: null,
+        expired: true,
+        paid,
+        retentionDays: RETENTION_DAYS,
+      }),
+      request,
+      clientId
+    );
+  }
+
+  const files = found.files as ExportedFile[];
 
   // Ký lại từng link. Đã trả tiền thì trả bản SẠCH — cùng một luật với
   // /api/unlock, chỉ khác là gộp cả bộ trong một lượt.

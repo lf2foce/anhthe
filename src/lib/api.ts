@@ -81,6 +81,10 @@ export function exportFiles(opts: {
 /** Phiên xuất gần nhất của khách (theo cookie) — đường về sau khi F5 */
 export async function fetchSession(): Promise<{
   session: { sessionId: string; files: ExportedFile[]; paid: boolean } | null;
+  /** Có phiên cũ nhưng ảnh đã quá hạn lưu trên kho */
+  expired?: boolean;
+  paid?: boolean;
+  retentionDays?: number;
 }> {
   const res = await fetch("/api/session");
   if (!res.ok) throw new Error("Không đọc được phiên cũ.");
