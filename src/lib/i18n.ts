@@ -50,6 +50,8 @@ export interface Copy {
   /** Chọn trang phục AI mặc — chỉ hiện với loại giấy tờ cho phép */
   outfitLabel: string;
   outfitNote: string;
+  /** Vì sao mục trang phục bị khoá với loại giấy tờ này */
+  outfitLocked: string;
   /** Giải thích vì sao có nền không bấm được */
   bgRule: string;
   bright: string;
@@ -191,7 +193,9 @@ export const COPY: Record<Lang, Copy> = {
     bgLabel: "Nền ảnh",
     outfitLabel: "Trang phục",
     outfitNote:
-      "AI mặc áo mới từ cổ trở xuống — mặt, tóc và biểu cảm giữ nguyên tuyệt đối. Chỉ có ở ảnh thẻ dân dụng; visa, hộ chiếu và hồ sơ thi cấm chỉnh sửa nên không mở mục này.",
+      "AI mặc áo mới từ cổ trở xuống — mặt, tóc và biểu cảm giữ nguyên tuyệt đối.",
+    outfitLocked:
+      "Loại này không đổi được trang phục. Không phải vì áo bạn đang mặc sai — visa và hộ chiếu chấp nhận quần áo thường ngày. Lý do là nơi nhận CẤM ảnh đã qua chỉnh sửa số hoá, nên mặc thêm vest vào là tạo ra một cách trượt mới chứ không giúp đạt.",
     bgRule: "Chuẩn giấy tờ quyết định màu nền — màu không được phép sẽ tự khoá.",
     bright: "Độ sáng",
     headRatio: "Tỉ lệ đầu",
@@ -333,7 +337,9 @@ export const COPY: Record<Lang, Copy> = {
     bgLabel: "Background",
     outfitLabel: "Outfit",
     outfitNote:
-      "The AI swaps clothing from the neckline down — face, hair and expression stay untouched. Civilian ID photos only; visas, passports and exam files forbid retouching so this is hidden there.",
+      "The AI swaps clothing from the neckline down — face, hair and expression stay untouched.",
+    outfitLocked:
+      "This document type cannot have its clothing changed. Not because what you are wearing is wrong — visas and passports accept normal street attire. It is because the authority forbids digitally altered photos, so adding a suit creates a new way to fail rather than a way to pass.",
     bgRule: "The document standard decides the background — forbidden colours are locked.",
     bright: "Brightness",
     headRatio: "Head size",

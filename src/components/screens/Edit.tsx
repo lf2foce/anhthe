@@ -250,10 +250,23 @@ export function Edit({
           <p className="m-0 text-[10.5px] leading-snug text-pop-ink/50">{t.bgRule}</p>
           </div>
 
-          {/* Trang phục — CHỈ hiện với loại registry cho phép. Ẩn hẳn thay vì
-              hiện rồi khoá: mở một mục ra để nói "không dùng được đâu" là quảng
-              cáo cho thứ mình vừa từ chối bán. */}
-          {OUTFIT_ALLOWED.has(spec.id) ? (
+          {/* Trang phục. Loại KHÔNG được phép thì vẫn hiện mục nhưng nói RÕ lý
+              do — ẩn câm khiến khách (và chính chủ app) tưởng là thiếu tính
+              năng, rồi đi tìm cách bật nó lên. Lý do ở đây không phải "chúng
+              tôi chưa làm" mà là "nơi nhận cấm", và đó là thứ phải nói ra. */}
+          {!OUTFIT_ALLOWED.has(spec.id) ? (
+            <div className="flex flex-col gap-1.5 rounded-2xl border-2 border-pop-ink/15 bg-pop-bg p-3">
+              <span className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-pop-ink/45">
+                {t.outfitLabel}
+                <span className="rounded-full bg-pop-ink/10 px-2 py-0.5 text-[9.5px] normal-case tracking-normal">
+                  {lang === "vi" ? "khoá" : "locked"}
+                </span>
+              </span>
+              <p className="m-0 text-[10.5px] leading-snug text-pop-ink/55">
+                {t.outfitLocked}
+              </p>
+            </div>
+          ) : (
           <div className="flex flex-col gap-2">
             <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-pop-ink/45">
               {t.outfitLabel}
@@ -279,7 +292,7 @@ export function Edit({
               {t.outfitNote}
             </p>
           </div>
-          ) : null}
+          )}
 
           <div className="flex flex-col gap-2">
 
