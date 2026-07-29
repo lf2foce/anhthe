@@ -71,6 +71,32 @@ const RELAXED_FOR_PORTRAIT: readonly CheckId[] = [
   "no_hat_no_glasses",
 ];
 
+/**
+ * Tiêu chí mà TỪNG LOẠI cụ thể KHÔNG bị đánh trượt vì — ngoại lệ của luật họ.
+ *
+ * Vì sao cần: trước đây mọi giấy tờ tuỳ thân chịu chung một luật, nên đeo kính
+ * là trượt cho cả bộ — kể cả khi khách chỉ làm ảnh 3×4 xin việc, nơi đeo kính là
+ * bình thường. Cảnh báo sai chỗ thì khách hoặc chụp lại vô ích, hoặc học cách
+ * phớt lờ cảnh báo — và lần sau phớt lờ đúng cái cảnh báo thật.
+ *
+ * Mỗi dòng phải có NGUỒN. Không tra được thì KHÔNG nới — mặc định là giữ
+ * nguyên mức khắt khe của họ.
+ */
+const DOC_RELAXED: Record<string, readonly CheckId[]> = {
+  // travel.state.gov: kính bị CẤM hẳn từ 01/11/2016 → us KHÔNG có tên ở đây.
+  // ICAO 9303 / hướng dẫn Schengen: kính trong suốt được phép nếu thấy rõ mắt,
+  // không loá, không gọng che mắt. Vậy đeo kính là GHI CHÚ, không phải trượt.
+  schen: ["no_hat_no_glasses"],
+  // Tờ khai TK01 ghi "không đeo kính màu" — tức kính trong suốt thì được.
+  vnhc: ["no_hat_no_glasses"],
+  // 3×4/4×6 dân dụng không có văn bản nào; thực tế tiệm ảnh chụp cả người đeo
+  // kính. Biểu cảm cũng vậy — mỉm cười nhẹ trên ảnh hồ sơ xin việc là bình thường.
+  vn34: ["no_hat_no_glasses", "neutral_expression"],
+  vn46: ["no_hat_no_glasses", "neutral_expression"],
+  // exam: hồ sơ thi đòi "kiểu căn cước" mà chưa tra được văn bản nói rõ về kính
+  // → KHÔNG nới, giữ phía an toàn.
+};
+
 /** Tiêu chí BẮT BUỘC theo từng họ giấy tờ. */
 export const FAMILY_REQUIRED: Record<DocFamily, ReadonlySet<CheckId>> = {
   id: new Set<CheckId>(CHECK_ORDER),
@@ -91,6 +117,29 @@ export function requiredChecks(families: DocFamily[]): ReadonlySet<CheckId> {
   return out;
 }
 
+/**
+ * Tiêu chí nào bắt buộc, và bắt buộc VÌ LOẠI NÀO.
+ *
+ * Trả về danh sách loại thay vì một cờ đúng/sai: khách cần biết "đeo kính thì
+ * hỏng cái gì" chứ không phải "có gì đó hỏng". Rỗng = không loại nào đòi, tức
+ * chỉ là ghi chú.
+ */
+export function requiredByDoc(docIds: string[]): Map<CheckId, string[]> {
+  const out = new Map<CheckId, string[]>();
+  for (const id of docIds) {
+    const spec = getDoc(id);
+    if (!spec) continue;
+    const relaxed = DOC_RELAXED[spec.id] ?? [];
+    for (const checkId of FAMILY_REQUIRED[spec.family]) {
+      if (relaxed.includes(checkId)) continue;
+      const list = out.get(checkId);
+      if (list) list.push(spec.id);
+      else out.set(checkId, [spec.id]);
+    }
+  }
+  return out;
+}
+
 /** Quan sát thuần — model chấm, không phụ thuộc người dùng chọn loại nào */
 export interface CheckObservation {
   id: CheckId;
@@ -103,6 +152,13 @@ export interface CheckItem extends CheckObservation {
   fixable: boolean;
   /** Có bắt buộc với tập giấy tờ người dùng đang chọn không */
   required: boolean;
+  /**
+   * Những loại ĐANG CHỌN thật sự đòi tiêu chí này. Rỗng = chỉ là ghi chú.
+   *
+   * Có danh sách này thì UI nói được "đeo kính — hỏng Visa Mỹ" thay vì "đeo
+   * kính — hỏng cái gì đó", và khách chỉ làm 3×4 thì không bị doạ vô cớ.
+   */
+  requiredBy: string[];
 }
 
 /** Đánh giá hình học của ảnh với MỘT loại giấy tờ */
@@ -230,7 +286,7 @@ export function evaluate(
     },
   ];
 
-  const required = requiredChecks(familiesOf(docIds));
+  const requiredBy = requiredByDoc(docIds);
   const byId = new Map<CheckId, CheckObservation>();
   for (const c of check.checks) {
     byId.set(
@@ -247,7 +303,8 @@ export function evaluate(
     return {
       ...obs,
       fixable: FIXABLE.has(id),
-      required: required.has(id),
+      required: (requiredBy.get(id)?.length ?? 0) > 0,
+      requiredBy: requiredBy.get(id) ?? [],
     };
   });
 

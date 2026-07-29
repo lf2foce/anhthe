@@ -39,6 +39,8 @@ export interface Copy {
 
   /** Hậu tố cho tiêu chí không bắt buộc với tập giấy tờ đang chọn */
   notRequired: string;
+  /** Tiền tố liệt kê loại giấy tờ thật sự đòi tiêu chí này */
+  requiredForPrefix: string;
 
   editTitle: string;
   /** Hai bậc của panel Chỉnh sửa: bắt buộc theo chuẩn vs làm đẹp tuỳ chọn */
@@ -181,6 +183,7 @@ export const COPY: Record<Lang, Copy> = {
     retake: "Chụp lại",
     checkFailed: "Không kiểm tra được ảnh",
     notRequired: "· không bắt buộc cho lựa chọn này",
+    requiredForPrefix: "bắt buộc cho",
 
     editTitle: "Chỉnh sửa",
     sectionFormat: "Căn đúng chuẩn giấy tờ",
@@ -322,6 +325,7 @@ export const COPY: Record<Lang, Copy> = {
     retake: "Retake",
     checkFailed: "Could not check the photo",
     notRequired: "· not required for this selection",
+    requiredForPrefix: "required for",
 
     editTitle: "Retouch",
     sectionFormat: "Match the document format",

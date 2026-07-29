@@ -7,6 +7,7 @@ import {
   passCount,
   requiredChecks,
   requiredCount,
+  requiredByDoc,
   verdictOf,
   type CheckId,
   type CheckItem,
@@ -16,13 +17,14 @@ import { familiesOf, getDoc } from "./docs";
 
 /** Dựng bộ 8 tiêu chí, mặc định đạt hết; `failed` là những id cho trượt. */
 function checksFor(docIds: string[], failed: CheckId[] = []): CheckItem[] {
-  const required = requiredChecks(familiesOf(docIds));
+  const requiredBy = requiredByDoc(docIds);
   return CHECK_ORDER.map((id) => ({
     id,
     pass: !failed.includes(id),
     detail: "",
     fixable: FIXABLE.has(id),
-    required: required.has(id),
+    required: (requiredBy.get(id)?.length ?? 0) > 0,
+    requiredBy: requiredBy.get(id) ?? [],
   }));
 }
 
@@ -68,9 +70,13 @@ describe("verdictOf", () => {
     expect(verdictOf(checks)).toBe("fail");
   });
 
-  it("đeo kính chỉ chặn khi có giấy tờ tuỳ thân trong danh sách", () => {
+  it("đeo kính chỉ chặn khi loại ĐANG CHỌN thật sự cấm", () => {
+    // Ảnh chân dung: kính là bình thường.
     expect(verdictOf(checksFor(["link"], ["no_hat_no_glasses"]))).toBe("pass");
-    expect(verdictOf(checksFor(["vn34"], ["no_hat_no_glasses"]))).toBe("fail");
+    // 3×4 dân dụng: không văn bản nào cấm, tiệm ảnh chụp cả người đeo kính.
+    expect(verdictOf(checksFor(["vn34"], ["no_hat_no_glasses"]))).toBe("pass");
+    // Visa Mỹ: travel.state.gov cấm hẳn từ 01/11/2016 — đây mới là trượt.
+    expect(verdictOf(checksFor(["us"], ["no_hat_no_glasses"]))).toBe("fail");
   });
 
   it("lỗi sửa được bằng phần mềm thì là fixable, không phải fail", () => {
@@ -144,7 +150,7 @@ describe("evaluate", () => {
 
   it("bỏ tick loại khắt khe thì verdict nới lại — cùng một quan sát", () => {
     const check = photoCheck(["no_hat_no_glasses"]);
-    expect(evaluate(check, ["link", "vn34"]).verdict).toBe("fail");
+    expect(evaluate(check, ["link", "us"]).verdict).toBe("fail");
     expect(evaluate(check, ["link"]).verdict).toBe("pass");
   });
 
@@ -211,5 +217,37 @@ describe("hợp đồng danh sách tiêu chí", () => {
     expect(CHECK_ORDER).toHaveLength(8);
     for (const id of AI_CHECK_IDS) expect(CHECK_ORDER).toContain(id);
     expect(new Set(CHECK_ORDER).size).toBe(CHECK_ORDER.length);
+  });
+});
+
+describe("cảnh báo tách theo TỪNG loại, không gộp theo họ", () => {
+  /**
+   * Trước đây mọi giấy tờ tuỳ thân chịu chung một luật, nên khách chỉ làm ảnh
+   * 3×4 xin việc mà đeo kính vẫn bị báo trượt. Cảnh báo sai chỗ thì khách hoặc
+   * chụp lại vô ích, hoặc học cách phớt lờ cảnh báo — và lần sau phớt lờ đúng
+   * cái cảnh báo thật.
+   */
+  it("nói RÕ loại nào đòi, không chỉ nói có/không", () => {
+    const map = requiredByDoc(["vn34", "us"]);
+    // Chỉ visa Mỹ đòi bỏ kính; 3×4 thì không.
+    expect(map.get("no_hat_no_glasses")).toEqual(["us"]);
+    // Nhưng tiêu chí hình học thì cả hai đều đòi.
+    expect(map.get("head_ratio")).toEqual(["vn34", "us"]);
+  });
+
+  it("chỉ chọn loại đã nới thì tiêu chí đó KHÔNG bắt buộc với ai", () => {
+    expect(requiredByDoc(["vn34", "vn46"]).get("no_hat_no_glasses")).toBeUndefined();
+    expect(requiredByDoc(["vn34"]).get("neutral_expression")).toBeUndefined();
+  });
+
+  it("loại chưa tra được văn bản thì GIỮ khắt khe, không nới bừa", () => {
+    // exam: quy chế đòi "kiểu căn cước" nhưng chưa tra được câu nào về kính.
+    expect(requiredByDoc(["exam"]).get("no_hat_no_glasses")).toEqual(["exam"]);
+  });
+
+  it("kính trong suốt: Schengen và hộ chiếu VN cho phép, Mỹ thì không", () => {
+    expect(requiredByDoc(["schen"]).get("no_hat_no_glasses")).toBeUndefined();
+    expect(requiredByDoc(["vnhc"]).get("no_hat_no_glasses")).toBeUndefined();
+    expect(requiredByDoc(["us"]).get("no_hat_no_glasses")).toEqual(["us"]);
   });
 });

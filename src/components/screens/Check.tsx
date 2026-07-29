@@ -159,6 +159,19 @@ function Result({
                   <span className="pl-1.5 font-normal text-pop-ink/45">
                     {t.notRequired}
                   </span>
+                ) : c.requiredBy.length < result.fits.length ? (
+                  // Chỉ MỘT SỐ loại đang chọn đòi tiêu chí này → nói tên ra.
+                  // "Có gì đó hỏng" không giúp khách quyết định gì; "đeo kính
+                  // hỏng Visa Mỹ" thì họ biết ngay là bỏ kính hay bỏ visa.
+                  <span className="pl-1.5 font-normal text-pop-ink/45">
+                    · {t.requiredForPrefix}{" "}
+                    {c.requiredBy
+                      .map((id) => {
+                        const d = getDoc(id);
+                        return lang === "vi" ? d?.vi : d?.en;
+                      })
+                      .join(", ")}
+                  </span>
                 ) : null}
               </span>
               {!c.pass && c.detail ? (

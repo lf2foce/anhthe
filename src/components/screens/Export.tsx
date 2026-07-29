@@ -229,10 +229,29 @@ export function Export({
         ))}
       </div>
 
+      {/* Mỗi tiêu chí trượt nói RÕ nó chặn loại nào. Gộp thành một dòng
+          "Không mũ, không kính" là bắt khách tự đoán trong 5 loại đang tick thì
+          cái nào hỏng — và nếu chỉ một loại hỏng, họ có thể bỏ tick loại đó
+          thay vì chụp lại cả buổi. */}
       {failing.length ? (
         <ErrorNote>
           <strong className="block pb-1">{t.stillFailing}</strong>
-          {failing.map((c) => CHECK_LABELS[c.id]?.[lang] ?? c.id).join(", ")}
+          <ul className="m-0 list-none space-y-1 p-0">
+            {failing.map((c) => (
+              <li key={c.id}>
+                {CHECK_LABELS[c.id]?.[lang] ?? c.id}
+                <span className="pl-1.5 opacity-70">
+                  · {t.requiredForPrefix}{" "}
+                  {c.requiredBy
+                    .map((id) => {
+                      const d = getDoc(id);
+                      return lang === "vi" ? d?.vi : d?.en;
+                    })
+                    .join(", ")}
+                </span>
+              </li>
+            ))}
+          </ul>
         </ErrorNote>
       ) : null}
 
