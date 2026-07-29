@@ -16,6 +16,7 @@ import {
   docsOf,
   familyOf,
   getDoc,
+  regimeOf,
   resolveBackground,
   type BackgroundId,
 } from "@/lib/docs";
@@ -121,7 +122,19 @@ export function Studio({ initialLang = "vi" }: { initialLang?: Lang }) {
   const groups = retouchGroups(s);
   const pending = pendingGroups(s);
   const fit = compliance(s);
-  const idDocs = docsOf("id");
+  /*
+   * Màn Xuất chỉ liệt kê loại CÙNG CHẾ ĐỘ với loại chính.
+   *
+   * Loại khác chế độ dù sao cũng phải chuẩn hoá riêng một lượt (ảnh dân dụng
+   * được mặc vest, ảnh chính thức thì cấm mọi chỉnh sửa), nên bày chúng ra chỉ
+   * để nói "chọn thì tốn thêm một lượt" là mời khách vào một ngã rẽ mà họ gần
+   * như không bao giờ muốn: ai làm visa thì làm visa, không kèm ảnh 3×4 xin
+   * việc trong cùng một lượt. Muốn cả hai thì chụp lại từ trang chủ — rõ ràng
+   * hơn là trộn trong một màn.
+   */
+  const idDocs = docsOf("id").filter(
+    (d) => regimeOf(d.id) === regimeOf(editSpec.id)
+  );
 
   // ── hành động ────────────────────────────────────────────────────────────
 
@@ -139,6 +152,9 @@ export function Studio({ initialLang = "vi" }: { initialLang?: Lang }) {
     setS((prev) => {
       if (id === prev.primary) return prev;
       if (familyOf(id) !== familyOf(prev.primary)) return prev;
+      // Khác chế độ chuẩn = phải chuẩn hoá riêng và chịu luật khác — chặn ở đây
+      // chứ không chỉ ẩn khỏi danh sách.
+      if (regimeOf(id) !== regimeOf(prev.primary)) return prev;
       return {
         ...prev,
         picked: prev.picked.includes(id)

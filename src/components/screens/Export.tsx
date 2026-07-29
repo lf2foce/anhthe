@@ -146,9 +146,7 @@ export function Export({
                 style={{ background: g.bg.hex }}
               />
               <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-pop-ink/60">
-                {lang === "vi"
-                  ? `Nền ${g.bg.vi.toLowerCase()} · ${g.regime === "civil" ? "dân dụng" : "chính thức"}`
-                  : `${g.bg.en} · ${g.regime === "civil" ? "civilian" : "official"}`}
+                {lang === "vi" ? `Nền ${g.bg.vi.toLowerCase()}` : `${g.bg.en} background`}
               </span>
               <span
                 className={`ml-auto text-[10px] font-semibold ${
