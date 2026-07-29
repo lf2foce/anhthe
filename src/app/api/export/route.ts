@@ -24,6 +24,7 @@ import {
 } from "@/lib/geometry";
 import { decodeDataUrl } from "@/lib/imageio";
 import { newSessionId, storeImage, type StoredImage } from "@/lib/storage";
+import { saveSessionFiles } from "@/lib/orders";
 import { checkSize, remainingFor, withClientCookie } from "@/lib/gate";
 import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/errors";
@@ -360,6 +361,14 @@ export async function POST(request: Request) {
         upscaled: printPhoto.upscaled,
         warnings: [],
       });
+    }
+
+    // Ghi lại phiên để khôi phục được sau F5. Không chặn phản hồi nếu DB chớp:
+    // khách đang cầm file rồi, mất bản ghi khôi phục còn hơn mất cả lượt xuất.
+    try {
+      await saveSessionFiles(clientId, sessionId, files);
+    } catch (e) {
+      console.error("[api/export] không ghi được phiên:", e);
     }
 
     // PHẢI trả cookie: route này có thể là lượt gọi ĐẦU TIÊN của phiên (người

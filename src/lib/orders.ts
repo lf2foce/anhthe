@@ -26,6 +26,13 @@ export const PAYEE = {
   name: process.env.PHOTO_BANK_NAME ?? "",
 };
 
+/**
+ * Kênh liên hệ khi thanh toán trục trặc. Bắt buộc phải có khi thu tiền: khách
+ * chuyển khoản mà webhook lỗi thì hiện tại không biết kêu ai, và mã memo là
+ * bằng chứng duy nhất họ cầm.
+ */
+export const SUPPORT = process.env.PHOTO_SUPPORT_CONTACT ?? "";
+
 export const payeeConfigured =
   PAYEE.bank !== "" && PAYEE.account !== "" && PAYEE.name !== "";
 
@@ -138,6 +145,52 @@ export async function sessionPaid(
   return rows.length > 0;
 }
 
+/**
+ * Ghi lại danh sách file của một lượt xuất, để dựng lại màn Hoàn tất sau F5.
+ *
+ * Ghi ĐÈ theo (client, session): xuất lại cùng phiên (thêm cỡ, đổi độ sáng) là
+ * thay bộ file cũ, không đẻ hàng mới.
+ */
+export async function saveSessionFiles(
+  clientId: string,
+  sessionId: string,
+  files: unknown
+): Promise<void> {
+  if (!sql) return;
+  await sql`
+    INSERT INTO photo_session (client_id, session_id, files)
+    VALUES (${clientId}, ${sessionId}, ${JSON.stringify(files)})
+    ON CONFLICT (client_id, session_id)
+      DO UPDATE SET files = EXCLUDED.files, created_at = now()
+  `;
+}
+
+/** Đọc lại phiên xuất gần nhất của khách này — nguồn cho việc khôi phục sau F5 */
+export async function latestSession(
+  clientId: string
+): Promise<{ sessionId: string; files: unknown } | null> {
+  if (!sql) return null;
+  const rows = (await sql`
+    SELECT session_id, files FROM photo_session
+    WHERE client_id = ${clientId}
+    ORDER BY created_at DESC LIMIT 1
+  `) as Array<{ session_id: string; files: unknown }>;
+  return rows.length > 0
+    ? { sessionId: rows[0].session_id, files: rows[0].files }
+    : null;
+}
+
+/**
+ * Gắn email vào đơn — xin lúc trả tiền để còn gửi lại link nếu hỏng.
+ *
+ * Không bắt buộc: khách không muốn cho email vẫn phải mua được. Đây là lời mời,
+ * không phải cửa ải.
+ */
+export async function attachEmail(memo: string, email: string): Promise<void> {
+  if (!sql) return;
+  await sql`UPDATE photo_order SET email = ${email} WHERE memo = ${memo}`;
+}
+
 /** Đọc đơn theo mã memo — webhook cần biết GIÁ trước khi đánh dấu đã trả. */
 export async function orderByMemo(memo: string): Promise<Order | null> {
   if (!sql) return null;
@@ -146,6 +199,102 @@ export async function orderByMemo(memo: string): Promise<Order | null> {
     ORDER BY created_at DESC LIMIT 1
   `) as OrderRow[];
   return rows.length > 0 ? toOrder(rows[0]) : null;
+}
+
+export interface AdminStats {
+  paidToday: number;
+  revenueToday: number;
+  paid30: number;
+  revenue30: number;
+  pendingCount: number;
+  /** Doanh thu 14 ngày gần nhất, cũ → mới, ngày không có đơn vẫn có mặt với 0 */
+  daily: Array<{ day: string; orders: number; revenue: number }>;
+  byPlan: Array<{ planId: string; orders: number; revenue: number }>;
+  /** Lượt gọi model hôm nay (hàng __global__ của photo_quota) */
+  callsToday: number;
+  recent: Array<{
+    memo: string;
+    planId: string;
+    amountVnd: number;
+    status: string;
+    email: string | null;
+    createdAt: string;
+    paidAt: string | null;
+  }>;
+}
+
+/**
+ * Số liệu cho dashboard chủ app.
+ *
+ * Tính TRONG SQL chứ không kéo hết đơn về rồi cộng ở JS: bảng đơn sẽ dài mãi
+ * còn trang này mở hằng ngày. `generate_series` để ngày không có đơn vẫn xuất
+ * hiện với 0 — biểu đồ nhảy cóc qua ngày trống là biểu đồ nói dối về nhịp bán.
+ */
+export async function adminStats(): Promise<AdminStats | null> {
+  if (!sql) return null;
+
+  const [totals, daily, byPlan, calls, recent] = await Promise.all([
+    sql`
+      SELECT
+        count(*) FILTER (WHERE status = 'paid' AND paid_at::date = CURRENT_DATE) AS paid_today,
+        coalesce(sum(amount_vnd) FILTER (WHERE status = 'paid' AND paid_at::date = CURRENT_DATE), 0) AS revenue_today,
+        count(*) FILTER (WHERE status = 'paid' AND paid_at >= now() - INTERVAL '30 days') AS paid_30,
+        coalesce(sum(amount_vnd) FILTER (WHERE status = 'paid' AND paid_at >= now() - INTERVAL '30 days'), 0) AS revenue_30,
+        count(*) FILTER (WHERE status = 'pending') AS pending_count
+      FROM photo_order
+    `,
+    sql`
+      SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+             count(o.id) AS orders,
+             coalesce(sum(o.amount_vnd), 0) AS revenue
+      FROM generate_series(CURRENT_DATE - 13, CURRENT_DATE, INTERVAL '1 day') AS d(day)
+      LEFT JOIN photo_order o
+        ON o.status = 'paid' AND o.paid_at::date = d.day
+      GROUP BY d.day ORDER BY d.day
+    `,
+    sql`
+      SELECT plan_id, count(*) AS orders, coalesce(sum(amount_vnd), 0) AS revenue
+      FROM photo_order WHERE status = 'paid'
+      GROUP BY plan_id ORDER BY revenue DESC
+    `,
+    sql`SELECT coalesce(used, 0) AS used FROM photo_quota
+        WHERE key = '__global__' AND day = CURRENT_DATE`,
+    sql`
+      SELECT memo, plan_id, amount_vnd, status, email, created_at, paid_at
+      FROM photo_order ORDER BY created_at DESC LIMIT 20
+    `,
+  ]);
+
+  const t = (totals as Array<Record<string, unknown>>)[0] ?? {};
+  const n = (v: unknown) => Number(v ?? 0);
+
+  return {
+    paidToday: n(t.paid_today),
+    revenueToday: n(t.revenue_today),
+    paid30: n(t.paid_30),
+    revenue30: n(t.revenue_30),
+    pendingCount: n(t.pending_count),
+    daily: (daily as Array<Record<string, unknown>>).map((r) => ({
+      day: String(r.day),
+      orders: n(r.orders),
+      revenue: n(r.revenue),
+    })),
+    byPlan: (byPlan as Array<Record<string, unknown>>).map((r) => ({
+      planId: String(r.plan_id),
+      orders: n(r.orders),
+      revenue: n(r.revenue),
+    })),
+    callsToday: n((calls as Array<Record<string, unknown>>)[0]?.used),
+    recent: (recent as Array<Record<string, unknown>>).map((r) => ({
+      memo: String(r.memo),
+      planId: String(r.plan_id),
+      amountVnd: n(r.amount_vnd),
+      status: String(r.status),
+      email: r.email ? String(r.email) : null,
+      createdAt: String(r.created_at),
+      paidAt: r.paid_at ? String(r.paid_at) : null,
+    })),
+  };
 }
 
 /** Đánh dấu đã nhận tiền. Gọi tay sau khi đối soát sao kê. */

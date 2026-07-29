@@ -55,6 +55,15 @@ export interface StoredImage {
   url: string;
   /** Khoá object của bản SẠCH, để mở khoá sau khi trả tiền */
   key: string;
+  /**
+   * Khoá bản ĐÓNG DẤU. Cần lưu để ký lại link khi khách quay lại sau khi link
+   * cũ hết hạn (1 giờ) mà CHƯA trả tiền — không lưu thì bản xem thử thành link
+   * chết, và người chưa mua là người mình cần giữ nhất.
+   *
+   * Lộ khoá này không mở thêm quyền gì: nó vẫn nằm trong thư mục của chính
+   * khách (`ownsKey`), và nó trỏ tới bản đã đóng dấu.
+   */
+  previewKey?: string;
   /** Đã là bản sạch chưa, hay đang là bản xem thử */
   unlocked: boolean;
 }
@@ -132,6 +141,7 @@ export async function storeImage(opts: {
   return {
     url: await signedUrl(opts.unlocked ? cleanKey : markKey),
     key: cleanKey,
+    previewKey: markKey,
     unlocked: !!opts.unlocked,
   };
 }

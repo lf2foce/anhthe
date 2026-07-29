@@ -8,6 +8,8 @@
 import { NextResponse } from "next/server";
 import { checkSize, remainingFor, withClientCookie } from "@/lib/gate";
 import {
+  attachEmail,
+  SUPPORT,
   ensureOrder,
   ordersAvailable,
   payeeConfigured,
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { sessionId?: string; planId?: string };
+  let body: { sessionId?: string; planId?: string; email?: string };
   try {
     body = await request.json();
   } catch {
@@ -48,12 +50,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Gói không hợp lệ." }, { status: 400 });
   }
 
+  /*
+   * Email là TUỲ CHỌN: khách không muốn cho vẫn phải mua được.
+   *
+   * Kiểm hình dạng ở đây thay vì tin `type="email"` của trình duyệt — route này
+   * gọi được trực tiếp. Sai hình dạng thì BỎ QUA lặng lẽ chứ không chặn đơn:
+   * chặn một giao dịch có tiền thật vì cái email gõ nhầm là đánh đổi sai.
+   */
+  const email = (body.email ?? "").trim().toLowerCase();
+  if (email && /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/.test(email) && email.length <= 254) {
+    try {
+      await attachEmail(order.memo, email);
+    } catch (e) {
+      console.error("[api/order] không gắn được email:", e);
+    }
+  }
+
   return withClientCookie(
     NextResponse.json({
       memo: order.memo,
       amountVnd: order.amountVnd,
       status: order.status,
       qrUrl: vietQrUrl(order),
+      support: SUPPORT,
     }),
     request,
     clientId

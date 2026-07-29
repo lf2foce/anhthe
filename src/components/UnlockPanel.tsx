@@ -21,6 +21,7 @@ interface OrderInfo {
   amountVnd: number;
   status: string;
   qrUrl: string;
+  support: string;
 }
 
 export function UnlockPanel({
@@ -40,6 +41,7 @@ export function UnlockPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
+  const [email, setEmail] = useState("");
 
   /**
    * Tự hỏi lại trạng thái mỗi 6s khi đang chờ tiền — webhook SePay đánh dấu đơn
@@ -47,8 +49,14 @@ export function UnlockPanel({
    * phải tự bấm "Tôi đã chuyển khoản" mới biết. Poll IM LẶNG (không đụng busy)
    * để nút bấm tay không nhấp nháy theo.
    */
+  // Giữ callback mới nhất trong ref và cập nhật TRONG effect: gán thẳng khi
+  // render là "ghi ref trong lúc render" (React compiler chặn). Cần ref vì cha
+  // tạo lại `onUnlocked` mỗi lần render — để nó vào deps thì interval bị dựng
+  // lại liên tục và không bao giờ chạm mốc 6 giây.
   const onUnlockedRef = useRef(onUnlocked);
-  onUnlockedRef.current = onUnlocked;
+  useEffect(() => {
+    onUnlockedRef.current = onUnlocked;
+  }, [onUnlocked]);
   const waiting = order !== null && order.status !== "paid";
   useEffect(() => {
     if (!waiting) return;
@@ -68,7 +76,7 @@ export function UnlockPanel({
     setBusy(true);
     setError(null);
     try {
-      const o = await createOrder({ sessionId, planId });
+      const o = await createOrder({ sessionId, planId, email });
       setOrder(o);
       if (o.status === "paid") onUnlocked();
     } catch (e) {
@@ -135,15 +143,38 @@ export function UnlockPanel({
           </button>
           {checked && order.status !== "paid" ? (
             <span className="text-center text-[11px] leading-snug text-pop-ink/55">
-              Chưa thấy giao dịch. Chuyển khoản thường về sau vài phút — thử lại
-              giúp nhé.
+              Chưa thấy giao dịch. Chuyển khoản thường về sau vài phút — trang
+              này tự kiểm tra lại, cứ để mở.
+            </span>
+          ) : null}
+          {/* Kênh liên hệ đặt ĐÚNG chỗ dễ hỏng nhất: khách vừa chuyển tiền mà
+              chưa mở khoá thì cần biết kêu ai NGAY, không phải đi tìm ở footer. */}
+          {order.support ? (
+            <span className="text-center text-[10.5px] leading-snug text-pop-ink/55">
+              Chuyển rồi mà chưa mở khoá? Nhắn {order.support} kèm mã{" "}
+              <strong>{order.memo}</strong>.
             </span>
           ) : null}
         </div>
       ) : (
-        <PrimaryButton onClick={open} disabled={busy}>
-          {busy ? "…" : "Mở khoá bản sạch"}
-        </PrimaryButton>
+        <>
+          {/* Email TUỲ CHỌN, xin đúng lúc trả tiền — không phải lúc vào app.
+              Bắt đăng ký trước khi khách thấy ảnh đẹp là cách giết chuyển đổi
+              nhanh nhất; còn ở đây khách đã quyết mua, cho email là hợp lý vì
+              chính họ cần chỗ nhận lại hàng nếu hỏng. */}
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email nhận link (không bắt buộc)"
+            className="w-full rounded-full border-2 border-pop-ink/20 bg-white px-4 py-2.5 text-[12.5px] outline-none placeholder:text-pop-ink/40 focus:border-viol"
+          />
+          <PrimaryButton onClick={open} disabled={busy}>
+            {busy ? "…" : "Mở khoá bản sạch"}
+          </PrimaryButton>
+        </>
       )}
 
       {error ? <ErrorNote>{error}</ErrorNote> : null}

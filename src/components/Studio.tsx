@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { checkPhoto, exportFiles, fetchQuota, retouchPhoto } from "@/lib/api";
+import {
+  checkPhoto,
+  exportFiles,
+  fetchQuota,
+  fetchSession,
+  retouchPhoto,
+} from "@/lib/api";
 import { fileToPhoto } from "@/lib/capture";
 import {
   BACKGROUNDS,
@@ -39,21 +45,13 @@ import { Edit } from "./screens/Edit";
 import { Export } from "./screens/Export";
 import { Done } from "./screens/Done";
 
-export function Studio() {
-  const [lang, setLang] = useState<Lang>("vi");
-  /**
-   * Nhận ngôn ngữ từ landing qua `?lang=en`.
-   *
-   * Đọc trong effect chứ KHÔNG trong useState initializer: server render ra
-   * "vi" còn client đọc query ra "en" thì lệch cây HTML — React sẽ báo hydration
-   * mismatch và dựng lại cả nhánh. Nhấp một nhịp sang tiếng Anh là cái giá rẻ
-   * hơn nhiều so với đó.
-   */
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("lang");
-    if (q === "en" || q === "vi") setLang(q);
-  }, []);
+export function Studio({ initialLang = "vi" }: { initialLang?: Lang }) {
+  // Ngôn ngữ do SERVER quyết từ `?lang=` rồi truyền xuống (xem app/app/page.tsx)
+  // — không đọc query trong effect: sửa state ngay sau render là cascading
+  // render, và HTML đầu tiên sẽ sai ngôn ngữ trong một nhịp.
+  const [lang, setLang] = useState<Lang>(initialLang);
   const [s, setS] = useState<StudioState>(INITIAL);
+
   /**
    * Hai luồng tách hẳn: "id" = 6 màn compliance; "creative" = CreativeStudio tự
    * quản màn của nó. Không chung state — ảnh chụp cho ảnh thẻ và ảnh cho pack
@@ -73,6 +71,40 @@ export function Studio() {
     fetchQuota().then(setQuota).catch(() => {});
   }, []);
   useEffect(refreshQuota, [refreshQuota]);
+
+  /**
+   * Khôi phục lượt xuất gần nhất khi mở lại app.
+   *
+   * Đây là chốt chống mất tiền, không phải tiện ích: trước đây khách chuyển
+   * khoản xong mà lỡ F5 là mất đường về — ảnh sạch vẫn ở R2, đơn vẫn `paid`,
+   * nhưng UI không còn sessionId nên không xin lại link được, và làm lại từ đầu
+   * thì sinh sessionId mới khiến đơn cũ vô giá trị.
+   *
+   * Chỉ nhảy thẳng tới màn Hoàn tất khi ĐÃ TRẢ TIỀN. Phiên chưa trả tiền vẫn
+   * nạp file (để bấm "Xuất ảnh" thấy lại ngay) nhưng để khách ở trang chủ —
+   * dựng lại nguyên màn cũ cho người chỉ định chụp ảnh mới là chắn đường họ.
+   */
+  useEffect(() => {
+    let alive = true;
+    fetchSession()
+      .then(({ session }) => {
+        if (!alive || !session || session.files.length === 0) return;
+        setS((prev) => {
+          // Đã bắt tay làm việc mới thì không giật màn hình của khách.
+          if (prev.photo || prev.screen !== "home") return prev;
+          return {
+            ...prev,
+            files: session.files,
+            exportSessionId: session.sessionId,
+            screen: session.paid ? "done" : prev.screen,
+          };
+        });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const t = COPY[lang];
   const patch = useCallback(

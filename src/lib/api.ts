@@ -78,11 +78,29 @@ export function exportFiles(opts: {
   return post("/api/export", opts);
 }
 
+/** Phiên xuất gần nhất của khách (theo cookie) — đường về sau khi F5 */
+export async function fetchSession(): Promise<{
+  session: { sessionId: string; files: ExportedFile[]; paid: boolean } | null;
+}> {
+  const res = await fetch("/api/session");
+  if (!res.ok) throw new Error("Không đọc được phiên cũ.");
+  return res.json();
+}
+
 /** Tạo/lấy đơn cho một phiên — trả mã memo và link QR */
 export function createOrder(opts: {
   sessionId: string;
   planId: string;
-}): Promise<{ memo: string; amountVnd: number; status: string; qrUrl: string }> {
+  /** Tuỳ chọn — để gửi lại link nếu hỏng và gửi hoá đơn */
+  email?: string;
+}): Promise<{
+  memo: string;
+  amountVnd: number;
+  status: string;
+  qrUrl: string;
+  /** Kênh liên hệ khi thanh toán trục trặc; rỗng nếu chưa cấu hình */
+  support: string;
+}> {
   return post("/api/order", opts);
 }
 

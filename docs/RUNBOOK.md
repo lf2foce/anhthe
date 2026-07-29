@@ -311,7 +311,7 @@ Nói thẳng để người tiếp quản không tưởng đã xong:
   nhưng không còn đường nào vào giao diện sau lần tách luồng.
 - ~~Đối soát thanh toán thủ công~~ → ĐÃ XONG (29/07/2026): webhook SePay, xem
   mục 10. Đường tay qua `/api/admin/mark-paid` vẫn giữ làm dự phòng.
-- **Không có observability**: không request id, không đếm lần gọi model theo thời
+- **Không có observability chi tiết** (request id, tỉ lệ lỗi theo route): không request id, không đếm lần gọi model theo thời
   gian, không biết tỉ lệ lỗi. Khi có khách thật thì đây là thứ thiếu đau nhất.
 
 ---
@@ -352,3 +352,49 @@ curl -s -X POST https://<domain>/api/webhooks/sepay \
 # → {"success":true,"ignored":"không có đơn"} nếu mã không khớp đơn nào — nghĩa là
 # xác thực + parse chạy đúng. Sai key phải ra 401; bỏ header phải ra 401.
 ```
+
+---
+
+## 11. Bảng điều khiển & khôi phục phiên
+
+### /admin — số liệu bán hàng
+
+Vào bằng `https://<domain>/admin?token=<PHOTO_ADMIN_TOKEN>`. Không token thì chỉ
+hiện ô nhập, **không số nào render ra HTML** (kiểm ở server component, không phải
+ẩn bằng CSS). Không đặt `PHOTO_ADMIN_TOKEN` thì trang tắt hẳn.
+
+Hiện: doanh thu hôm nay / 30 ngày, đơn đang chờ, **lượt gọi model hôm nay so với
+`PHOTO_GLOBAL_DAILY_CALLS`** (ô này chuyển hồng khi vượt 80% — đó là cảnh báo
+cháy ví, xem trước khi xem doanh thu), biểu đồ 14 ngày, doanh thu theo gói, 20
+đơn gần nhất kèm email.
+
+Số liệu tính TRONG SQL, không kéo đơn về cộng ở JS — bảng đơn dài mãi còn trang
+này mở hằng ngày. Giờ hiển thị ép `Asia/Ho_Chi_Minh`: Vercel chạy UTC, không khai
+tường minh thì "hôm nay" lệch 7 tiếng so với ngày làm việc thật.
+
+### Khôi phục phiên sau khi khách F5
+
+Trước đây phiên chỉ nằm trong RAM của tab: khách chuyển khoản xong mà lỡ F5 là
+mất đường về — ảnh sạch vẫn ở R2, đơn vẫn `paid`, nhưng UI không còn `sessionId`.
+Nay `/api/export` ghi danh sách file vào `photo_session`, và `/api/session` dựng
+lại theo cookie `aid` (30 ngày).
+
+Tính chất phải giữ:
+
+- Route **chỉ đọc phiên của chính cookie đang gửi** — không có tham số nào từ
+  client chọn đọc phiên của ai.
+- **Ký lại link** khi trả về (link presigned chỉ sống 1 giờ). Chưa trả tiền thì
+  ký lại đúng bản ĐÓNG DẤU (`previewKey`), tuyệt đối không rơi sang bản sạch.
+- Chỉ nhảy thẳng vào màn Hoàn tất khi phiên **đã trả tiền**; chưa trả thì nạp
+  file nhưng để khách ở trang chủ.
+
+### Chạy migration
+
+```bash
+psql "$PHOTO_DATABASE_URL" -f migrations/002_session_recovery_and_email.sql
+```
+
+> **Bẫy đã dính:** viết script chạy migration bằng cách tách câu theo `;` rồi bỏ
+> câu bắt đầu bằng `--` thì **bỏ sạch mọi câu** — vì câu nào cũng có khối chú
+> thích đứng trước. Nó chạy xong, im lặng, không tạo gì. Bỏ comment TRƯỚC rồi mới
+> tách câu, hoặc dùng `psql -f` như trên.
