@@ -17,15 +17,20 @@ import type { Lang } from "./i18n";
  * Địa chỉ công khai của site.
  *
  * BẮT BUỘC cho `metadataBase`: thiếu nó thì Next dựng URL ảnh chia sẻ dạng
- * tương đối, và Facebook/Zalo bỏ qua thẻ đó — link dán ra chỉ còn chữ. Đặt qua
- * env để bản preview không quảng cáo ảnh của bản prod.
+ * tương đối, và Facebook/Zalo bỏ qua thẻ đó — link dán ra chỉ còn chữ.
+ *
+ * KHÔNG có tiền tố `NEXT_PUBLIC_`: biến này chỉ được đọc ở phía server
+ * (layout, sitemap, robots, landing đều là server component). Gắn NEXT_PUBLIC_
+ * là bắt Next nhét nó vào bundle gửi xuống trình duyệt cho mọi khách tải, đổi
+ * lấy đúng không gì — và khoá cứng giá trị vào lúc build, kể cả ở những route
+ * chạy động.
  */
 function resolveSiteUrl(): string {
   // `??` KHÔNG chặn chuỗi rỗng, mà biến để trống trong .env là chuyện thường —
   // và khi đó `new URL("")` ném lỗi làm GÃY CẢ BUILD với một câu không liên
   // quan ("Failed to collect configuration for /_not-found"). Đã dính đúng ca
   // này. Vì vậy coi rỗng/khoảng trắng là KHÔNG CÓ.
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const explicit = process.env.SITE_URL?.trim();
   if (explicit) return explicit.replace(/\/+$/, "");
 
   const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();

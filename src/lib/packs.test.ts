@@ -136,7 +136,7 @@ describe("ratioLabel — nhãn tỉ lệ đọc từ kích thước THẬT của
 
 describe("SITE_URL — env để trống không được làm gãy build", () => {
   /**
-   * `NEXT_PUBLIC_SITE_URL=` (rỗng) là chuyện rất thường khi dựng file env, và
+   * `SITE_URL=` (rỗng) là chuyện rất thường khi dựng file env, và
    * `??` không chặn chuỗi rỗng. Khi đó `new URL("")` ném lỗi ở tầng metadata và
    * build chết với một câu chẳng liên quan gì: "Failed to collect configuration
    * for /_not-found". Đã dính đúng ca này.
@@ -149,7 +149,7 @@ describe("SITE_URL — env để trống không được làm gãy build", () =>
 
   it("để trống thì rơi về localhost, KHÔNG ném lỗi", async () => {
     const url = await load({
-      NEXT_PUBLIC_SITE_URL: "",
+      SITE_URL: "",
       VERCEL_PROJECT_PRODUCTION_URL: "",
     });
     expect(() => new URL(url)).not.toThrow();
@@ -158,7 +158,7 @@ describe("SITE_URL — env để trống không được làm gãy build", () =>
 
   it("chỉ khoảng trắng cũng coi như trống", async () => {
     const url = await load({
-      NEXT_PUBLIC_SITE_URL: "   ",
+      SITE_URL: "   ",
       VERCEL_PROJECT_PRODUCTION_URL: "",
     });
     expect(url).toBe("http://localhost:3000");
@@ -167,7 +167,7 @@ describe("SITE_URL — env để trống không được làm gãy build", () =>
   it("có domain Vercel thì dùng nó khi không khai tường minh", async () => {
     expect(
       await load({
-        NEXT_PUBLIC_SITE_URL: "",
+        SITE_URL: "",
         VERCEL_PROJECT_PRODUCTION_URL: "anhthe.vn",
       })
     ).toBe("https://anhthe.vn");
@@ -175,7 +175,7 @@ describe("SITE_URL — env để trống không được làm gãy build", () =>
 
   it("cắt dấu / thừa ở cuối — nếu không thì mọi URL sinh ra có hai gạch", async () => {
     expect(
-      await load({ NEXT_PUBLIC_SITE_URL: "https://anhthe.vn/" })
+      await load({ SITE_URL: "https://anhthe.vn/" })
     ).toBe("https://anhthe.vn");
   });
 });
