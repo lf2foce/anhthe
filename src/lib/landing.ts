@@ -13,6 +13,19 @@
 
 import type { Lang } from "./i18n";
 
+/**
+ * Địa chỉ công khai của site.
+ *
+ * BẮT BUỘC cho `metadataBase`: thiếu nó thì Next dựng URL ảnh chia sẻ dạng
+ * tương đối, và Facebook/Zalo bỏ qua thẻ đó — link dán ra chỉ còn chữ. Đặt qua
+ * env để bản preview không quảng cáo ảnh của bản prod.
+ */
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
+
 export interface LandingCopy {
   metaTitle: string;
   metaDescription: string;

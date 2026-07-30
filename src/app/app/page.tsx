@@ -10,7 +10,15 @@ import type { Lang } from "@/lib/i18n";
  * render). Đọc ở đây thì HTML đầu tiên đã đúng ngôn ngữ.
  */
 export const metadata = {
-  title: "Ảnh thẻ Studio",
+  title: "Studio",
+  /*
+   * KHÔNG cho đánh chỉ mục màn ứng dụng.
+   *
+   * Nó là một màn công cụ rỗng khi chưa có ảnh — người từ Google rơi thẳng vào
+   * đây sẽ thấy một trang không giải thích gì và thoát ngay, kéo tụt chính trang
+   * bán hàng đang cạnh tranh cùng từ khoá. Trang cần được tìm thấy là landing.
+   */
+  robots: { index: false, follow: true },
 };
 
 export default async function AppPage({

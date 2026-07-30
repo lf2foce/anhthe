@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PACKS } from "@/lib/packs";
 import { PLANS, formatVnd } from "@/lib/pricing";
 import { DOCS } from "@/lib/docs";
-import { LANDING } from "@/lib/landing";
+import { LANDING, SITE_URL } from "@/lib/landing";
 import type { Lang } from "@/lib/i18n";
 
 /**
@@ -45,10 +45,44 @@ export function Landing({ lang }: { lang: Lang }) {
   const appHref = lang === "en" ? "/app?lang=en" : "/app";
   const otherHref = lang === "en" ? "/" : "/en";
 
+  /*
+   * JSON-LD: nói cho máy tìm kiếm biết đây là DỊCH VỤ gì và giá bao nhiêu.
+   * Giá đọc từ `PLANS` — bịa số ở đây rồi lệch với trang giá là kiểu sai tệ
+   * nhất: Google phạt vì dữ liệu có cấu trúc không khớp nội dung nhìn thấy.
+   */
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "Ảnh thẻ Studio",
+    url: `${SITE_URL}${lang === "en" ? "/en" : "/"}`,
+    applicationCategory: "PhotographyApplication",
+    operatingSystem: "Web",
+    inLanguage: lang === "en" ? "en" : "vi",
+    description: c.metaDescription,
+    offers: PLANS.map((p) => ({
+      "@type": "Offer",
+      name: lang === "vi" ? p.vi : p.en,
+      price: p.priceVnd,
+      priceCurrency: "VND",
+    })),
+  };
+
   return (
+    // `lang` đặt Ở ĐÂY cho nhánh tiếng Anh: thẻ <html> nằm trong root layout nên
+    // cố định "vi", còn nội dung trang /en thì không phải tiếng Việt. Khai lang
+    // trên chính khối nội dung là cách hợp chuẩn để nói đúng ngôn ngữ mà không
+    // phải dựng lại toàn bộ cây route theo locale.
     // overflow-x-clip: các sticker cố ý xoay/thò nhẹ; không clip thì mobile có
     // thanh cuộn ngang vô duyên.
-    <main className="min-h-dvh overflow-x-clip bg-pop-bg font-body text-pop-ink">
+    <main
+      lang={lang}
+      className="min-h-dvh overflow-x-clip bg-pop-bg font-body text-pop-ink"
+    >
+      <script
+        type="application/ld+json"
+        // Dữ liệu do MÌNH dựng từ registry, không có gì từ người dùng.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* ── Thanh trên ──────────────────────────────────────────────────── */}
       <header className="mx-auto flex max-w-[1120px] items-center justify-between px-5 pt-5 sm:px-8">
         <span className="font-display text-[19px] font-bold tracking-tight">
