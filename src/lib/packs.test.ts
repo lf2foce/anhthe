@@ -6,7 +6,7 @@
  * trong MỌI prompt, và các pack thật sự khác nhau. Không gọi mạng.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   MAX_NOTE_LENGTH,
   PACKS,
@@ -131,5 +131,51 @@ describe("ratioLabel — nhãn tỉ lệ đọc từ kích thước THẬT của
     expect(ratioLabel(1000, 1234)).toBe("4:5");
     // 0.714 lệch ~5% khỏi 3:4 và xa mọi nhãn khác — mới thật sự là lạ.
     expect(ratioLabel(1000, 1400)).toBe("1000:1400");
+  });
+});
+
+describe("SITE_URL — env để trống không được làm gãy build", () => {
+  /**
+   * `NEXT_PUBLIC_SITE_URL=` (rỗng) là chuyện rất thường khi dựng file env, và
+   * `??` không chặn chuỗi rỗng. Khi đó `new URL("")` ném lỗi ở tầng metadata và
+   * build chết với một câu chẳng liên quan gì: "Failed to collect configuration
+   * for /_not-found". Đã dính đúng ca này.
+   */
+  async function load(env: Record<string, string | undefined>) {
+    for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v ?? "");
+    vi.resetModules();
+    return (await import("./landing")).SITE_URL;
+  }
+
+  it("để trống thì rơi về localhost, KHÔNG ném lỗi", async () => {
+    const url = await load({
+      NEXT_PUBLIC_SITE_URL: "",
+      VERCEL_PROJECT_PRODUCTION_URL: "",
+    });
+    expect(() => new URL(url)).not.toThrow();
+    expect(url).toBe("http://localhost:3000");
+  });
+
+  it("chỉ khoảng trắng cũng coi như trống", async () => {
+    const url = await load({
+      NEXT_PUBLIC_SITE_URL: "   ",
+      VERCEL_PROJECT_PRODUCTION_URL: "",
+    });
+    expect(url).toBe("http://localhost:3000");
+  });
+
+  it("có domain Vercel thì dùng nó khi không khai tường minh", async () => {
+    expect(
+      await load({
+        NEXT_PUBLIC_SITE_URL: "",
+        VERCEL_PROJECT_PRODUCTION_URL: "anhthe.vn",
+      })
+    ).toBe("https://anhthe.vn");
+  });
+
+  it("cắt dấu / thừa ở cuối — nếu không thì mọi URL sinh ra có hai gạch", async () => {
+    expect(
+      await load({ NEXT_PUBLIC_SITE_URL: "https://anhthe.vn/" })
+    ).toBe("https://anhthe.vn");
   });
 });

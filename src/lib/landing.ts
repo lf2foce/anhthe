@@ -20,11 +20,21 @@ import type { Lang } from "./i18n";
  * tương đối, và Facebook/Zalo bỏ qua thẻ đó — link dán ra chỉ còn chữ. Đặt qua
  * env để bản preview không quảng cáo ảnh của bản prod.
  */
-export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "http://localhost:3000");
+function resolveSiteUrl(): string {
+  // `??` KHÔNG chặn chuỗi rỗng, mà biến để trống trong .env là chuyện thường —
+  // và khi đó `new URL("")` ném lỗi làm GÃY CẢ BUILD với một câu không liên
+  // quan ("Failed to collect configuration for /_not-found"). Đã dính đúng ca
+  // này. Vì vậy coi rỗng/khoảng trắng là KHÔNG CÓ.
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (vercel) return `https://${vercel}`;
+
+  return "http://localhost:3000";
+}
+
+export const SITE_URL = resolveSiteUrl();
 
 export interface LandingCopy {
   metaTitle: string;
